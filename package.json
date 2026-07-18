@@ -1,0 +1,111 @@
+{
+  "name": "renamo",
+  "version": "1.5.2",
+  "description": "Batch file renamer",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:mac": "electron-builder --mac --arm64",
+    "build:mac-universal": "electron-builder --mac dmg --universal",
+    "build:win": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.justedit.renamo",
+    "productName": "renamo",
+    "copyright": "Copyright \u00a9 2026 just edit",
+    "files": [
+      "src/**/*",
+      "build/icon.icns",
+      "build/icon.ico",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "minimumSystemVersion": "11.0",
+      "darkModeSupport": true,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "renamo ${version}",
+      "icon": "build/icon.icns",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 150,
+          "y": 190,
+          "type": "file"
+        },
+        {
+          "x": 390,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "renamo",
+      "license": "build/license.txt"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "dmg-license": "^1.0.11"
+  },
+  "dependencies": {},
+  "author": "just edit",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noar-justedit/renamo.git"
+  },
+  "homepage": "https://github.com/noar-justedit/renamo",
+  "bugs": {
+    "url": "https://github.com/noar-justedit/renamo/issues"
+  }
+}
