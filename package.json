@@ -1,6 +1,6 @@
 {
   "name": "renamo",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Batch file renamer",
   "main": "src/main.js",
   "scripts": {

@@ -293,6 +293,9 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
           <button type="button" class="stepbtn" data-target="ins-pos" data-delta="1" aria-label="Increase position">+</button>
         </div>
       </div>
+      <div class="fcol" style="flex:1.2"><div class="flab">From</div>
+        <div class="seg" id="ins-dir"><span data-v="start" class="active">Start</span><span data-v="end">End</span></div>
+      </div>
     </div>
   </div>
   <!-- EXTENSION -->
@@ -423,7 +426,12 @@ function buildName(item, index, S){
   if(ins.on && ins.str){
     const txt=ins.str.normalize('NFC');
     const pos=Math.max(1, parseInt(ins.pos||1,10));
-    const i=Math.min(base.length, pos-1);
+    let i;
+    if(ins.dir==='end'){
+      i=Math.max(0, base.length - (pos-1));
+    } else {
+      i=Math.min(base.length, pos-1);
+    }
     base = base.slice(0,i) + txt + base.slice(i);
   }
   const r=S.remove;
@@ -470,7 +478,7 @@ function gatherSettings(){
   const segVal = id => {const a=document.querySelector('#'+id+' span.active');return a?a.dataset.v:'end';};
   return {
     clean:{on:onOf('clean')},
-    insert:{on:onOf('insert'), str:document.getElementById('ins-str').value, pos:document.getElementById('ins-pos').value},
+    insert:{on:onOf('insert'), str:document.getElementById('ins-str').value, pos:document.getElementById('ins-pos').value, dir:segVal('ins-dir')},
     add:{on:onOf('add'), prefix:document.getElementById('add-prefix').value, suffix:document.getElementById('add-suffix').value},
     remove:{on:onOf('remove'), str:document.getElementById('rm-str').value,
             first:document.getElementById('rm-first').value, last:document.getElementById('rm-last').value},
@@ -740,7 +748,7 @@ document.querySelectorAll('.sw').forEach(sw=>{
     recompute();
   });
 });
-['dt-pos','nb-pos'].forEach(id=>{
+['dt-pos','nb-pos','ins-dir'].forEach(id=>{
   document.getElementById(id).addEventListener('click', e=>{
     const sp=e.target.closest('span'); if(!sp) return;
     document.querySelectorAll('#'+id+' span').forEach(x=>x.classList.remove('active'));

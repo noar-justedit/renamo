@@ -4,6 +4,8 @@ Batch rename files and folders with a live preview. Build a new name from indepe
 
 macOS and Windows. Built with Electron. No dependencies, no sign-up.
 
+![renamo screenshot](screenshots/renamo.png)
+
 ## Features
 
 - Browse your disks, select files or folders
