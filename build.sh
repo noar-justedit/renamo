@@ -47,15 +47,15 @@ case "$1" in
     npm run build:win
     echo ""
     echo "  Done."
-    echo "  Installer:  dist/renamo Setup $VERSION.exe   (NSIS)"
-    echo "  Portable:   dist/renamo-$VERSION-win.zip"
+    echo "  Installer:  dist/renamo-Setup-$VERSION.exe   (NSIS)"
+    echo "  Portable:   dist/renamo-$VERSION-win-x64.zip"
     ;;
   *)
     echo "  Building macOS Apple Silicon (arm64)..."
     npm run build:mac
     echo ""
     echo "  Done."
-    echo "  Installer:  dist/renamo-$VERSION-arm64.dmg"
+    echo "  Installer:  dist/renamo-$VERSION-mac-arm64.dmg"
     echo "  App:        dist/mac-arm64/$APP.app"
     echo ""
     echo "  Open the .dmg and drag renamo into Applications."

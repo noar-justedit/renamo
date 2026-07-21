@@ -520,7 +520,7 @@ function recompute(){
   updateFooter();
 }
 
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function tokenizeName(s){ return s.split(/([_.\-\s])/).filter(function(x){ return x!==''; }); }
 function diffMarkup(oldName, newName){
   const a=tokenizeName(oldName.normalize('NFC')), b=tokenizeName(newName);
