@@ -15,6 +15,9 @@
 -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- Everything is local: no remote code, no eval. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none';" />
 <title>renamo</title>
 <link rel="stylesheet" href="vendor/tabler-icons.min.css" />
 <style>
@@ -62,7 +65,23 @@ body.win .winctl, body.linux .winctl{display:flex;}
   background:var(--bar);border-bottom:0.5px solid var(--bd);font-family:var(--mono);font-size:12px;color:var(--dim);}
 #pathbar .up{cursor:pointer;color:var(--dim);border:0.5px solid var(--bd2);border-radius:5px;padding:2px 6px;display:flex;align-items:center;}
 #pathbar .up:hover{color:var(--txt);}
-#crumbs{display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;}
+#crumbs{display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;flex:1;min-width:0;}
+.pbtools{display:flex;align-items:center;gap:6px;flex:none;}
+.filterwrap{display:flex;align-items:center;gap:5px;background:var(--field);border:0.5px solid var(--bd2);border-radius:5px;padding:1px 6px;}
+.filterwrap i{font-size:12px;color:var(--dim2);}
+.filterwrap.on{border-color:var(--accent);}
+#flt{background:transparent;border:none;outline:none;color:var(--txt);font-family:var(--mono);font-size:12px;width:120px;padding:2px 0;}
+#flt::placeholder{color:var(--faint);}
+.fclear{border:none;background:transparent;color:var(--dim2);cursor:pointer;padding:0;display:none;align-items:center;}
+.filterwrap.on .fclear{display:flex;}
+.fclear:hover{color:var(--txt);}
+#sort-key{font-family:var(--sans);font-size:11px;background:var(--field);border:0.5px solid var(--bd2);border-radius:5px;color:var(--dim);padding:3px 20px 3px 7px;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236f6f78' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 5px center;}
+#sort-dir{border:0.5px solid var(--bd2);border-radius:5px;background:transparent;color:var(--dim);cursor:pointer;padding:2px 5px;display:flex;align-items:center;}
+#sort-dir:hover{color:var(--txt);border-color:var(--bd3);}
+#sort-dir i{font-size:13px;}
+body.dropping #main{box-shadow:inset 0 0 0 2px var(--accent);}
 #crumbs .cr{cursor:pointer;color:#9a9aa2;}
 #crumbs .cr:hover{color:var(--txt);text-decoration:underline;}
 #crumbs .cr.last{color:var(--txt);cursor:default;text-decoration:none;}
@@ -113,12 +132,12 @@ body.win .winctl, body.linux .winctl{display:flex;}
 #empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--faint);font-family:var(--sans);font-size:13px;}
 
 #modules{flex:none;background:var(--panel);border-top:0.5px solid var(--bd);padding:10px 12px;display:grid;grid-template-columns:repeat(12,1fr);gap:8px;align-items:start;}
-#card-add,#card-remove,#card-replace,#card-insert{grid-column:span 4;}
+#card-add,#card-remove,#card-replace,#card-insert,#card-regex{grid-column:span 4;}
 #card-datetime,#card-numbering{grid-column:span 3;}
-#card-extension{grid-column:span 2;}
+#card-extension,#card-case{grid-column:span 2;}
 .mcard{border-radius:7px;padding:9px 10px;border:0.5px solid var(--bd);background:var(--card-off);}
 .mcard.on{background:var(--card-on);border-color:var(--accent);}
-.clean-bar{grid-column:1 / -1;}
+.clean-bar{grid-column:span 6;}
 .clean-bar .mhead{margin-bottom:0;}
 .clean-desc{font-size:12px;color:var(--dim);margin-left:2px;}
 .mcard.on .clean-desc{color:#a39ad0;}
@@ -135,6 +154,11 @@ body.win .winctl, body.linux .winctl{display:flex;}
 .mcard.on .flab{color:#a39ad0;}
 .fld{font-family:var(--mono);font-size:13px;background:var(--field);border:0.5px solid var(--bd2);border-radius:5px;padding:5px 7px;color:var(--txt);width:100%;outline:none;}
 .fld:focus{border-color:var(--accent);}
+.fld.bad,.fld.bad:focus{border-color:var(--red);color:#e8a09b;}
+.hint{font-size:11px;color:var(--dim2);margin-top:5px;line-height:1.35;}
+.hint.err{color:var(--red);}
+.mcard.on .hint{color:#8f86bd;}
+.mcard.on .hint.err{color:var(--red);}
 select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236f6f78' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
   background-repeat:no-repeat;background-position:right 7px center;padding-right:22px;}
@@ -214,6 +238,21 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
 <div id="pathbar">
   <span class="up" id="btn-up" title="Up one level"><i class="ti ti-arrow-up"></i></span>
   <span id="crumbs"></span>
+  <div class="pbtools">
+    <span class="filterwrap" id="filterwrap">
+      <i class="ti ti-search"></i>
+      <input id="flt" type="text" placeholder="Filter" spellcheck="false" title="Filter the list (Cmd/Ctrl+F, Esc to clear)" />
+      <button class="fclear" id="flt-clear" title="Clear filter"><i class="ti ti-x"></i></button>
+    </span>
+    <select id="sort-key" title="Sort the list">
+      <option value="name">Name</option>
+      <option value="created">Date created</option>
+      <option value="modified">Date modified</option>
+      <option value="size">Size</option>
+      <option value="ext">Type</option>
+    </select>
+    <button id="sort-dir" title="Ascending / descending"><i class="ti ti-sort-ascending"></i></button>
+  </div>
 </div>
 
 <div id="main">
@@ -235,14 +274,6 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
 </div>
 
 <div id="modules">
-  <!-- CLEAN (full width) -->
-  <div class="mcard clean-bar" id="card-clean">
-    <div class="mhead">
-      <span class="sw" data-sw="clean"><span class="kn"></span></span>
-      <span class="mtitle">CLEAN</span>
-      <span class="clean-desc">Strip accents and special characters, replace spaces with _</span>
-    </div>
-  </div>
   <!-- ADD -->
   <div class="mcard" id="card-add">
     <div class="mhead"><span class="sw" data-sw="add"><span class="kn"></span></span><span class="mtitle">ADD</span></div>
@@ -297,6 +328,29 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
         <div class="seg" id="ins-dir"><span data-v="start" class="active">Start</span><span data-v="end">End</span></div>
       </div>
     </div>
+  </div>
+  <!-- REGEX -->
+  <div class="mcard" id="card-regex">
+    <div class="mhead"><span class="sw" data-sw="regex"><span class="kn"></span></span><span class="mtitle">REGEX</span></div>
+    <div class="frow">
+      <div class="fcol"><div class="flab">Pattern</div><input class="fld" id="rx-pattern" spellcheck="false" placeholder="(\d{4})-(\d{2})"
+           title="JavaScript regular expression, applied to the name without its extension." /></div>
+      <div class="fcol"><div class="flab">Replace</div><input class="fld" id="rx-replace" spellcheck="false" placeholder="$2_$1"
+           title="Replacement text. Use $1, $2… to reuse capture groups." /></div>
+    </div>
+    <div class="chk-inline" id="rx-icase-wrap"><span class="cbox" id="rx-icase"></span>Ignore case</div>
+    <div class="hint err" id="rx-hint" style="display:none;"></div>
+  </div>
+  <!-- CASE -->
+  <div class="mcard" id="card-case">
+    <div class="mhead"><span class="sw" data-sw="case"><span class="kn"></span></span><span class="mtitle">CASE</span></div>
+    <div class="flab">Mode</div>
+    <select class="fld" id="cs-mode">
+      <option value="lower">lowercase</option>
+      <option value="upper">UPPERCASE</option>
+      <option value="title">Title Case</option>
+      <option value="sentence">Sentence case</option>
+    </select>
   </div>
   <!-- EXTENSION -->
   <div class="mcard" id="card-extension">
@@ -368,13 +422,21 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
     <div class="flab" style="margin-top:6px;">Position</div>
     <div class="seg" id="nb-pos"><span data-v="start">Start</span><span data-v="end" class="active">End</span></div>
   </div>
+  <!-- CLEAN -->
+  <div class="mcard clean-bar" id="card-clean">
+    <div class="mhead">
+      <span class="sw" data-sw="clean"><span class="kn"></span></span>
+      <span class="mtitle">CLEAN</span>
+      <span class="clean-desc">Strip accents and special characters, replace spaces with _</span>
+    </div>
+  </div>
 </div>
 
 <div id="footer">
   <div class="foot-left">
     <span id="status">No selection</span>
     <div class="foot-meta">
-      <span class="fm-ver" id="fm-ver">v1.5.0</span>
+      <span class="fm-ver" id="fm-ver">v1.6.0</span>
       <span class="fm-sep">·</span>
       <a class="fm-link" id="lnk-github">github</a>
       <span class="fm-sep">·</span>
@@ -393,13 +455,18 @@ const api = window.renamo;
 let treeRoots = [];
 let nodeIndex = new Map();
 let currentDir = null;
-let entries = [];
+let allEntries = [];      // everything read from the current folder
+let entries = [];         // the visible list: allEntries sorted, then filtered
 let selected = new Set();
 let computed = [];
 let lastUndo = null;
 let focusIndex = -1;
+let anchorIndex = -1;     // shift-click range anchor
+let sortKey = 'name';
+let sortDir = 1;          // 1 = ascending, -1 = descending
+let filterText = '';
 
-// ---- rename engine ----
+// ---- rename engine ---- ENGINE-START (kept free of DOM access: see test/engine.test.js)
 function splitName(name, isDir){
   if(isDir) return {base:name, ext:''};
   const i = name.lastIndexOf('.');
@@ -418,6 +485,24 @@ function cleanStr(s){
   s = s.replace(/ /g,'_');
   s = s.replace(/[^A-Za-z0-9_.\-]/g,'');
   return s;
+}
+// CASE: word boundaries are space, _, -, . and any digit run.
+function applyCase(s, mode){
+  if(mode==='lower') return s.toLowerCase();
+  if(mode==='upper') return s.toUpperCase();
+  if(mode==='title') return s.toLowerCase().replace(/[^\s._\-]+/g, w => w.charAt(0).toUpperCase()+w.slice(1));
+  if(mode==='sentence'){
+    const t=s.toLowerCase();
+    let done=false;
+    return t.replace(/[A-Za-zÀ-ɏ]/, ch => { if(done) return ch; done=true; return ch.toUpperCase(); });
+  }
+  return s;
+}
+// Compile a user regex once per recompute. Returns null when the pattern is invalid.
+function compileRegex(pattern, ignoreCase){
+  if(!pattern) return null;
+  try { return new RegExp(pattern, ignoreCase ? 'gi' : 'g'); }
+  catch(e){ return null; }
 }
 function buildName(item, index, S){
   let {base, ext} = splitName(item.name, item.isDir);
@@ -446,6 +531,13 @@ function buildName(item, index, S){
     if(rp.matchCase) base=base.split(search).join(rp.replaceWith||'');
     else{const esc=search.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');base=base.replace(new RegExp(esc,'gi'),rp.replaceWith||'');}
   }
+  const rx=S.regex;
+  if(rx.on && rx.pattern){
+    const re = rx.compiled !== undefined ? rx.compiled : compileRegex(rx.pattern, rx.ignoreCase);
+    if(re){ re.lastIndex=0; try{ base = base.replace(re, rx.replaceWith||''); }catch(e){} }
+  }
+  const cs=S.case;
+  if(cs.on) base = applyCase(base, cs.mode);
   const a=S.add;
   if(a.on) base=(a.prefix||'')+base+(a.suffix||'');
   const dt=S.datetime;
@@ -473,11 +565,18 @@ function buildName(item, index, S){
   return out.replace(/[\\/]/g,'');
 }
 
+// ENGINE-END
+
 function gatherSettings(){
   const onOf = id => document.querySelector('.sw[data-sw="'+id+'"]').classList.contains('on');
   const segVal = id => {const a=document.querySelector('#'+id+' span.active');return a?a.dataset.v:'end';};
+  const rxPattern = document.getElementById('rx-pattern').value;
+  const rxIcase = document.getElementById('rx-icase').classList.contains('on');
   return {
     clean:{on:onOf('clean')},
+    regex:{on:onOf('regex'), pattern:rxPattern, replaceWith:document.getElementById('rx-replace').value,
+           ignoreCase:rxIcase, compiled:compileRegex(rxPattern, rxIcase)},
+    case:{on:onOf('case'), mode:document.getElementById('cs-mode').value},
     insert:{on:onOf('insert'), str:document.getElementById('ins-str').value, pos:document.getElementById('ins-pos').value, dir:segVal('ins-dir')},
     add:{on:onOf('add'), prefix:document.getElementById('add-prefix').value, suffix:document.getElementById('add-suffix').value},
     remove:{on:onOf('remove'), str:document.getElementById('rm-str').value,
@@ -492,12 +591,22 @@ function gatherSettings(){
   };
 }
 
+function showRegexState(S){
+  const fld=document.getElementById('rx-pattern'), hint=document.getElementById('rx-hint');
+  const bad = S.regex.on && S.regex.pattern && !S.regex.compiled;
+  fld.classList.toggle('bad', !!bad);
+  hint.style.display = bad ? 'block' : 'none';
+  hint.textContent = bad ? 'Invalid regular expression — this rule is ignored.' : '';
+}
+
 function recompute(){
   const S = gatherSettings();
+  showRegexState(S);
   const selEntries = entries.filter(e => selected.has(e.path));
   const idxMap = new Map(); selEntries.forEach((e,i)=>idxMap.set(e.path,i));
   const lower = s => s.normalize('NFC').toLowerCase();
-  const siblingNames = new Set(entries.filter(e=>!selected.has(e.path)).map(e=>lower(e.name)));
+  // Collision check runs against every sibling on disk, including rows hidden by the filter.
+  const siblingNames = new Set(allEntries.filter(e=>!selected.has(e.path)).map(e=>lower(e.name)));
   const targetCount = new Map();
   const newNames = new Map();
   computed = [];
@@ -604,10 +713,12 @@ function updateFooter(){
   const st = document.getElementById('status');
   const conflicts = computed.filter(c=>c.status==='conflict').length;
   const okCount = computed.filter(c=>c.status==='ok').length;
-  const sel = selected.size;
-  if(sel===0){ st.textContent='No selection'; }
+  const sel = computed.length;                       // selected AND visible
+  const hidden = selected.size - sel;                // selected but hidden by the filter
+  if(sel===0){ st.textContent = hidden ? hidden+' selected, hidden by the filter' : 'No selection'; }
   else st.innerHTML = sel+' selected · '+okCount+' to rename'
-      + (conflicts? ' · <span class="conf">'+conflicts+' conflict'+(conflicts>1?'s':'')+'</span>':'');
+      + (conflicts? ' · <span class="conf">'+conflicts+' conflict'+(conflicts>1?'s':'')+'</span>':'')
+      + (hidden? ' · '+hidden+' hidden':'');
   document.getElementById('btn-rename').disabled = okCount===0;
   document.getElementById('btn-undo').disabled = !lastUndo;
 }
@@ -678,10 +789,36 @@ function renderNode(node){
 function volIcon(t){ if(t==='system')return 'ti-device-imac'; if(t==='home')return 'ti-home'; if(t==='network')return 'ti-network'; return 'ti-server-2'; }
 
 // ---- navigation ----
+// Sort the folder listing. Folders always stay on top, whatever the key.
+function sortEntries(list){
+  const cmpName = (a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'});
+  list.sort((a,b)=>{
+    if(a.isDir!==b.isDir) return a.isDir ? -1 : 1;
+    let r=0;
+    if(sortKey==='created') r=(a.birthtimeMs||0)-(b.birthtimeMs||0);
+    else if(sortKey==='modified') r=(a.mtimeMs||0)-(b.mtimeMs||0);
+    else if(sortKey==='size') r=(a.size||0)-(b.size||0);
+    else if(sortKey==='ext') r=(a.ext||'').toLowerCase().localeCompare((b.ext||'').toLowerCase());
+    else r=cmpName(a,b);
+    if(r===0) r=cmpName(a,b);
+    return r*sortDir;
+  });
+  return list;
+}
+// Rebuild the visible list from allEntries. The filter only hides rows; a hidden
+// row keeps its checkbox state but is never renamed.
+function applyView(){
+  const sorted = sortEntries(allEntries.slice());
+  const q = filterText.trim().toLowerCase();
+  entries = q ? sorted.filter(e => e.name.toLowerCase().includes(q)) : sorted;
+  if(focusIndex > entries.length-1) focusIndex = entries.length ? entries.length-1 : -1;
+  anchorIndex = -1;
+}
 async function openDir(p){
   const res = await api.readDir(p);
   if(!res.ok){ toast('Cannot open folder'); return; }
-  currentDir = p; entries = res.entries; selected = new Set();
+  currentDir = p; allEntries = res.entries; selected = new Set();
+  focusIndex = -1; applyView();
   focusIndex = entries.length ? 0 : -1;
   renderCrumbs(); await revealInTree(p); recompute();
 }
@@ -703,6 +840,13 @@ function renderCrumbs(){
 }
 
 function toggleSelect(path){ if(selected.has(path)) selected.delete(path); else selected.add(path); recompute(); }
+// Shift-click: select every row between the anchor and the clicked row.
+function selectRange(i){
+  if(anchorIndex < 0){ anchorIndex = i; toggleSelect(entries[i].path); return; }
+  const a=Math.min(anchorIndex,i), b=Math.max(anchorIndex,i);
+  for(let k=a;k<=b;k++) selected.add(entries[k].path);
+  recompute();
+}
 
 function setFocus(i){
   focusIndex = i; renderList();
@@ -756,6 +900,7 @@ document.querySelectorAll('.sw').forEach(sw=>{
   });
 });
 document.getElementById('rp-case').addEventListener('click', e=>{ e.target.classList.toggle('on'); autoActivate(document.getElementById('card-replace')); recompute(); });
+document.getElementById('rx-icase').addEventListener('click', e=>{ e.target.classList.toggle('on'); autoActivate(document.getElementById('card-regex')); recompute(); });
 document.querySelectorAll('.stepbtn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const el=document.getElementById(btn.dataset.target);
@@ -789,12 +934,18 @@ let clickTimer=null;
 document.getElementById('list').addEventListener('click', e=>{
   const row=e.target.closest('.row'); if(!row) return;
   const path=row.dataset.path; const isDir=row.dataset.dir==='1';
-  focusIndex = parseInt(row.dataset.i,10);
-  if(e.target.closest('.cbox')){ toggleSelect(path); return; }
+  const i = parseInt(row.dataset.i,10);
+  focusIndex = i;
+  if(e.shiftKey){                       // range select, no open-folder delay
+    if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
+    window.getSelection && window.getSelection().removeAllRanges();
+    selectRange(i); return;
+  }
+  if(e.target.closest('.cbox')){ anchorIndex=i; toggleSelect(path); return; }
   if(isDir){
     if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; return; }
-    clickTimer=setTimeout(()=>{ clickTimer=null; toggleSelect(path); },220);
-  } else toggleSelect(path);
+    clickTimer=setTimeout(()=>{ clickTimer=null; anchorIndex=i; toggleSelect(path); },220);
+  } else { anchorIndex=i; toggleSelect(path); }
 });
 document.getElementById('list').addEventListener('dblclick', e=>{
   const row=e.target.closest('.row'); if(!row) return;
@@ -805,6 +956,55 @@ document.getElementById('chk-all').addEventListener('click', ()=>{
   selected = all ? new Set() : new Set(entries.map(e=>e.path));
   recompute();
 });
+// ---- sort ----
+function refreshSortUI(){
+  const b=document.getElementById('sort-dir');
+  b.innerHTML = '<i class="ti ti-sort-'+(sortDir>0?'ascending':'descending')+'"></i>';
+  b.title = sortDir>0 ? 'Ascending — click for descending' : 'Descending — click for ascending';
+}
+document.getElementById('sort-key').addEventListener('change', e=>{
+  sortKey = e.target.value; applyView(); recompute();
+});
+document.getElementById('sort-dir').addEventListener('click', ()=>{
+  sortDir = -sortDir; refreshSortUI(); applyView(); recompute();
+});
+// ---- filter ----
+const fltEl = document.getElementById('flt');
+function refreshFilterUI(){
+  document.getElementById('filterwrap').classList.toggle('on', filterText.trim()!=='');
+}
+fltEl.addEventListener('input', ()=>{ filterText = fltEl.value; refreshFilterUI(); applyView(); recompute(); });
+fltEl.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ fltEl.value=''; filterText=''; refreshFilterUI(); applyView(); recompute(); fltEl.blur(); }
+});
+document.getElementById('flt-clear').addEventListener('click', ()=>{
+  fltEl.value=''; filterText=''; refreshFilterUI(); applyView(); recompute();
+});
+
+// ---- drag & drop from Finder / Explorer ----
+let dragDepth=0;
+window.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+window.addEventListener('dragenter', e=>{ e.preventDefault(); dragDepth++; document.body.classList.add('dropping'); });
+window.addEventListener('dragleave', ()=>{ if(--dragDepth<=0){ dragDepth=0; document.body.classList.remove('dropping'); } });
+window.addEventListener('drop', async e=>{
+  e.preventDefault(); dragDepth=0; document.body.classList.remove('dropping');
+  const files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+  if(!files.length) return;
+  const paths = files.map(f => { try { return api.getPathForFile(f); } catch(err){ return f.path || ''; } }).filter(Boolean);
+  if(!paths.length){ toast('Could not read the dropped item'); return; }
+  const info = await api.statPaths(paths);
+  const dirs = info.filter(x=>x.isDir), items = info.filter(x=>x.exists);
+  // A single folder: open it. Anything else: open the parent folder and tick the dropped items.
+  if(dirs.length===1 && items.length===1){ await openDir(dirs[0].path); return; }
+  if(!items.length){ toast('Could not read the dropped item'); return; }
+  const parent = api.dirname(items[0].path);
+  await openDir(parent);
+  const want = new Set(items.map(x=>x.path));
+  selected = new Set(entries.filter(en=>want.has(en.path)).map(en=>en.path));
+  recompute();
+  toast(selected.size+' item'+(selected.size>1?'s':'')+' selected');
+});
+
 document.getElementById('btn-rename').addEventListener('click', doRename);
 document.getElementById('btn-undo').addEventListener('click', doUndo);
 document.getElementById('btn-refresh').addEventListener('click', ()=>{ if(currentDir) openDir(currentDir); else loadVolumes(); });
@@ -821,12 +1021,28 @@ document.getElementById('wc-close').addEventListener('click', ()=>{ try{ api.win
 
 // ---- keyboard navigation ----
 document.addEventListener('keydown', e=>{
+  const mod = e.metaKey || e.ctrlKey;
+  if(mod && (e.key==='f'||e.key==='F')){ e.preventDefault(); fltEl.focus(); fltEl.select(); return; }
   const tag=(document.activeElement && document.activeElement.tagName||'').toLowerCase();
   if(tag==='input'||tag==='select'||tag==='textarea') return;
   if(!entries.length) return;
-  if(e.key==='ArrowDown'){ e.preventDefault(); setFocus(Math.min(entries.length-1, focusIndex<0?0:focusIndex+1)); }
-  else if(e.key==='ArrowUp'){ e.preventDefault(); setFocus(Math.max(0, focusIndex<0?0:focusIndex-1)); }
-  else if(e.key===' '){ e.preventDefault(); if(focusIndex>=0) toggleSelect(entries[focusIndex].path); }
+  if(mod && (e.key==='a'||e.key==='A')){
+    e.preventDefault();
+    selected = new Set(entries.map(en=>en.path)); anchorIndex=0; recompute(); return;
+  }
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    const ni=Math.min(entries.length-1, focusIndex<0?0:focusIndex+1);
+    if(e.shiftKey){ if(anchorIndex<0) anchorIndex=focusIndex<0?0:focusIndex; focusIndex=ni; selectRange(ni); setFocus(ni); }
+    else { anchorIndex=ni; setFocus(ni); }
+  }
+  else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    const ni=Math.max(0, focusIndex<0?0:focusIndex-1);
+    if(e.shiftKey){ if(anchorIndex<0) anchorIndex=focusIndex<0?0:focusIndex; focusIndex=ni; selectRange(ni); setFocus(ni); }
+    else { anchorIndex=ni; setFocus(ni); }
+  }
+  else if(e.key===' '){ e.preventDefault(); if(focusIndex>=0){ anchorIndex=focusIndex; toggleSelect(entries[focusIndex].path); } }
   else if(e.key==='Enter'){ if(focusIndex>=0 && entries[focusIndex].isDir) openDir(entries[focusIndex].path); }
   else if(e.key==='Backspace'){ e.preventDefault(); document.getElementById('btn-up').click(); }
 });
@@ -855,6 +1071,8 @@ function detectPlatform(){
 const plat = detectPlatform();
 document.body.classList.add(plat==='darwin'?'mac':(plat==='win32'?'win':'linux'));
 syncExtMode();
+refreshSortUI();
+refreshFilterUI();
 loadVolumes();
 renderList();
 updateFooter();

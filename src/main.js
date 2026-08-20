@@ -95,9 +95,9 @@ function createWindow() {
   const isWin = process.platform === 'win32';
   const opts = {
     width: 1180,
-    height: 760,
+    height: 820,
     minWidth: 940,
-    minHeight: 560,
+    minHeight: 620,
     backgroundColor: '#16161a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -269,6 +269,21 @@ ipcMain.handle('rename-batch', async (_e, pairs) => {
   }
 
   return { ok: failed.length === 0, done, failed, undo };
+});
+
+// ---------------------------------------------------------------------------
+// Stat a list of paths (used by drag & drop to tell folders from files)
+// ---------------------------------------------------------------------------
+ipcMain.handle('stat-paths', async (_e, paths) => {
+  const list = Array.isArray(paths) ? paths : [];
+  return list.map((p) => {
+    try {
+      const st = fs.statSync(p);
+      return { path: p, exists: true, isDir: st.isDirectory() };
+    } catch (err) {
+      return { path: p, exists: false, isDir: false };
+    }
+  });
 });
 
 ipcMain.handle('reveal', async (_e, p) => {

@@ -1,10 +1,11 @@
 {
   "name": "renamo",
-  "version": "1.5.4",
+  "version": "1.6.0",
   "description": "Batch file renamer",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node test/engine.test.js",
     "build:mac": "electron-builder --mac --arm64",
     "build:mac-universal": "electron-builder --mac dmg --universal",
     "build:win": "electron-builder --win --x64"

@@ -15,7 +15,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+// Electron 32+ removed File.path. webUtils.getPathForFile is the supported way to
+// turn a dropped File back into an absolute path; the fallback keeps older builds working.
+function getPathForFile(file){
+  try { if (webUtils && webUtils.getPathForFile) return webUtils.getPathForFile(file); } catch(e){}
+  return (file && file.path) || '';
+}
 
 // IMPORTANT: the preload runs sandboxed, where require('path') is NOT available.
 // So path helpers are implemented in plain JS (no require) to keep window.renamo
@@ -57,6 +64,8 @@ contextBridge.exposeInMainWorld('renamo', {
   basename,
   listVolumes: () => ipcRenderer.invoke('list-volumes'),
   readDir: (p) => ipcRenderer.invoke('read-dir', p),
+  statPaths: (paths) => ipcRenderer.invoke('stat-paths', paths),
+  getPathForFile,
   renameBatch: (pairs) => ipcRenderer.invoke('rename-batch', pairs),
   reveal: (p) => ipcRenderer.invoke('reveal', p),
   winMin: () => ipcRenderer.invoke('win-min'),
