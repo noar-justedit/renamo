@@ -1,6 +1,6 @@
 {
   "name": "renamo",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Batch file renamer",
   "main": "src/main.js",
   "scripts": {
@@ -14,6 +14,7 @@
     "appId": "com.justedit.renamo",
     "productName": "renamo",
     "copyright": "Copyright \u00a9 2026 just edit",
+    "afterSign": "scripts/notarize.js",
     "files": [
       "src/**/*",
       "build/icon.icns",
@@ -42,7 +43,17 @@
       "minimumSystemVersion": "11.0",
       "darkModeSupport": true,
       "hardenedRuntime": true,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": false,
+      "extendInfo": {
+        "NSDesktopFolderUsageDescription": "renamo needs access to your Desktop to list and rename the files it contains.",
+        "NSDocumentsFolderUsageDescription": "renamo needs access to your Documents to list and rename the files it contains.",
+        "NSDownloadsFolderUsageDescription": "renamo needs access to your Downloads to list and rename the files it contains.",
+        "NSRemovableVolumesUsageDescription": "renamo needs access to removable volumes to list and rename the files they contain.",
+        "NSNetworkVolumesUsageDescription": "renamo needs access to network volumes to list and rename the files they contain."
+      }
     },
     "dmg": {
       "title": "renamo ${version}",
@@ -96,6 +107,7 @@
     }
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "electron": "^42.0.0",
     "electron-builder": "^26.15.3",
     "dmg-license": "^1.0.11"

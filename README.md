@@ -32,21 +32,73 @@ or suffix you type is kept exactly as typed.
 
 Requires Node.js. From the project root:
 
+Three double-clickable files sit at the root of the project, for building without
+opening a terminal:
+
+| Double-click | What it does |
+|---|---|
+| `Build Mac.command` | signed and notarized macOS DMG |
+| `Build Windows.command` | Windows installer and portable zip |
+| `Build Mac + Windows.command` | both, for release day |
+
+Each one opens Terminal, runs the build and keeps the window open at the end so the
+result stays readable. macOS quarantines files that came out of a downloaded archive,
+so the very first time, **right-click the file and choose Open** instead of
+double-clicking it. To clear the flag on the whole folder in one go:
+`xattr -dr com.apple.quarantine <the renamo folder>`.
+
+They are thin wrappers around `build.sh`, which does everything on macOS — checks,
+tests, signing, notarization, stapling and verification:
+
 ```
-npm install
-npm test          # rename-engine checks, no build needed
-./release.sh      # tests + macOS DMG + Windows, in one go
-./build.sh        # macOS DMG (arm64) only
-./build-win.sh    # Windows installer (NSIS) + zip only
+./build.sh                 signed and notarized macOS DMG, ready to ship
+./build.sh --all           the same, plus the Windows build
+./build.sh --win           Windows only
+./build.sh --dev           run the app without building
+./build.sh --no-notarize   unsigned macOS build, local testing only
+./build.sh --setup         re-enter the Apple credentials
+npm test                   rename-engine checks alone, no build
 ```
 
-The three scripts are committed with the executable bit set. If your copy came
-from a zip or an archive that dropped it, restore it once with
-`chmod +x release.sh build.sh build-win.sh`.
+`build-win.sh` still exists for a Windows-only build without touching build.sh.
+The scripts are committed with the executable bit set; if your copy came from an
+archive that dropped it, restore it once with `chmod +x *.sh`.
+
+## Signing and notarization (macOS)
+
+The macOS build is signed with a Developer ID Application certificate and sent to
+Apple for notarization, so it opens with a double-click instead of the "unidentified
+developer" warning.
+
+You only need the **Developer ID Application** certificate in your login keychain
+(`security find-identity -v -p codesigning` should list it). On the first signed
+build, `build.sh` reads the team ID off that certificate, asks for your Apple ID and
+an [app-specific password](https://support.apple.com/en-us/102654) — not the Apple ID
+password — and stores them in the keychain as the `renamo-notarization` profile. It
+never asks again. Nothing secret is written into this folder: the script only ever
+refers to the profile by name. `NOTARY_PROFILE=<name>` points it at another profile,
+`./build.sh --setup` replaces the stored credentials.
+
+Under the hood, `scripts/notarize.js` runs as an electron-builder `afterSign` hook: it
+submits the signed `.app`, waits for Apple and staples the ticket into the bundle. The
+DMG is then built from that stapled app — and since electron-builder leaves the disk
+image itself unsigned, `build.sh` signs it with `codesign --timestamp` (Apple rejects
+an unsigned or untimestamped image) before submitting and stapling it in turn. Both
+the app and the disk image therefore carry their own signature and ticket, and both
+verify offline. Each submission takes a few minutes on Apple's side. If Apple rejects
+a build, the script prints the reasons it returned. Notarization needs Node 22.12 or
+newer, which is what `@electron/notarize` v3 requires.
+
+The Windows build is not signed: SmartScreen still shows a warning there.
 
 Both installers display the GNU GPL v3 license during installation.
 
 Building the Windows installer from macOS needs Wine; without it the script produces a portable .zip instead of the .exe. See the comments in build-win.sh.
+
+renamo is not sandboxed — it has to reach whatever volume you point it at. On first
+access macOS asks for permission to read your Desktop, Documents, Downloads and any
+removable or network volume; the reason strings shown in those prompts live in the
+`extendInfo` block of package.json.
 
 ## Updates
 
