@@ -218,6 +218,236 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
 .upd-btn:hover{border-color:var(--bd3);background:rgba(255,255,255,0.04);}
 .upd-go{background:var(--accent);border-color:var(--accent);color:#fff;}
 .upd-go:hover{background:var(--accent-hi);border-color:var(--accent-hi);}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHARTE UI NOAR · septembre 2026
+   ───────────────────────────────────────────────────────────────────────────
+   One block, appended after every other rule, that redefines the look on top of
+   the original stylesheet. Nothing above was rewritten: removing this block
+   brings back the previous look in one go.
+
+   The rule: grouping comes from the background, never from a line.
+   Three surfaces only - page, card, hollow - plus --raise for what floats.
+   No border anywhere except to state something: selection, keyboard focus, alert.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1 ── Tokens ─────────────────────────────────────────────────────────────── */
+:root{
+  --page:#0a0b0e; --card:#14161c; --ins:#0e1014; --raise:#1b1d24;
+  --text:#e8eaf0; --text2:#aeb3bd; --text3:#8b909b; --text4:#6f757f;
+  --green:#35c98b; --red:#f2555a; --blue:#4d90f0; --orange:#f2a03d;
+  /* renamo's own identity colour: Sapin, the green of the app icon (decided
+     21/09/2026). Deliberately darker than the state green #35c98b so the two
+     never read alike. Brand only - never used to mark a state. */
+  --accent:#3f9a6f;
+  --r-card:14px; --r-ins:11px; --r-field:8px; --r-badge:4px;
+  --font:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,monospace;
+
+  /* The original tokens, re-pointed so the untouched rules above follow along.
+     Every structural border used --bd/--bd2/--bd3: they become invisible. */
+  --bg:var(--page); --titlebar:var(--page); --bar:var(--card); --side:var(--card);
+  --panel:var(--page); --card-on:var(--card); --card-off:var(--card); --field:var(--ins);
+  --bd:transparent; --bd2:transparent; --bd3:transparent;
+  --txt:var(--text); --dim:var(--text2); --dim2:var(--text3); --faint:var(--text4);
+  --sans:var(--font);
+}
+body{background:var(--page);color:var(--text);font-family:var(--font);gap:12px;}
+
+/* Shared pieces of the charter */
+.badge{display:inline-block;font-family:var(--font);font-size:9px;font-weight:700;letter-spacing:.06em;
+  padding:2px 6px;border-radius:var(--r-badge);line-height:1.5;vertical-align:1px;}
+.b-green{color:var(--green);background:#35c98b26;}
+.b-red{color:var(--red);background:#f2555a26;}
+.b-blue{color:var(--blue);background:#4d90f026;}
+.b-orange{color:var(--orange);background:#f2a03d26;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:#2a2d36;border-radius:8px;border:none;background-clip:border-box;}
+::-webkit-scrollbar-thumb:hover{background:#343844;background-clip:border-box;}
+::-webkit-scrollbar-track{background:transparent;}
+
+/* Icon-only buttons: a 28 px square, the icon is the button. */
+.icobtn,#pathbar .up,#sort-dir,.hd-refresh{
+  width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;border:none;border-radius:8px;color:var(--text3);cursor:pointer;flex:none;}
+.icobtn:hover,#pathbar .up:hover,#sort-dir:hover,.hd-refresh:hover{background:var(--raise);color:var(--text);border:none;}
+#pathbar .up i,#sort-dir i{font-size:15px;}
+.hd-refresh{width:24px;height:24px;}
+
+/* 2 ── Title bar: sits on the page, no line under it ───────────────────────── */
+#titlebar{background:var(--page);border-bottom:none;height:40px;}
+#titlebar .word{color:var(--text);}
+.tbbtn{background:var(--card);border:none;border-radius:9px;padding:7px 12px;
+  color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;}
+.tbbtn:hover{color:var(--text);border:none;background:var(--raise);}
+.wc{border-radius:8px;color:var(--text3);}
+.wc:hover{background:var(--raise);color:var(--text);}
+.wc.wc-close:hover{background:var(--red);color:#fff;}
+
+/* 3 ── Path bar: a card of its own (navigation is one group of information) ── */
+#pathbar{margin:0 12px;height:42px;padding:0 8px 0 8px;gap:8px;background:var(--card);
+  border:none;border-radius:var(--r-card);font-family:var(--mono);font-size:12.5px;color:var(--text3);}
+#crumbs .cr{color:var(--text3);}
+#crumbs .cr:hover{color:var(--text);text-decoration:none;}
+#crumbs .cr.last{color:var(--text);}
+#crumbs .sep{color:var(--text4);}
+.filterwrap{background:var(--ins);border:none;border-radius:var(--r-field);padding:0 8px;height:30px;gap:7px;}
+.filterwrap:focus-within{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+.filterwrap.on{border:none;}
+.filterwrap.on > i{color:var(--orange);}             /* rows are hidden: something is missing from view */
+#flt{font-family:var(--mono);font-size:12px;color:var(--text);width:130px;}
+#flt::placeholder{color:var(--text4);}
+.fclear{color:var(--text3);}
+#sort-key{height:30px;background-color:var(--ins);border:none;border-radius:var(--r-field);
+  color:var(--text2);font-family:var(--font);font-size:12px;padding:0 24px 0 10px;background-position:right 8px center;}
+#sort-key:focus{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+
+/* 4 ── Main area: two cards side by side, 12 px apart ────────────────────── */
+#main{margin:0 12px;gap:0;}
+/* Exception to the charter, decided for renamo (1.6.2): the disk column keeps
+   its drag handle. The 12 px gap between the two cards IS the handle; a thin
+   neutral line shows only while hovering or dragging - no accent, no border. */
+#resizer{width:12px;margin:0;flex:none;cursor:col-resize;background:none;}
+#resizer:hover,#resizer.drag{background:linear-gradient(90deg,transparent 5px,rgba(255,255,255,.18) 5px,rgba(255,255,255,.18) 7px,transparent 7px);}
+#sidebar{width:228px;background:var(--card);border:none;border-radius:var(--r-card);
+  padding:12px 8px;font-family:var(--font);font-size:13px;}
+#sidebar .hd{display:flex;align-items:center;justify-content:space-between;height:24px;
+  padding:0 4px 0 8px;margin-bottom:6px;font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--text3);}
+.tnode{border-radius:var(--r-field);padding:5px 8px;color:var(--text2);gap:6px;}
+.tnode:hover{background:var(--raise);}
+.tnode.sel{background:var(--ins);color:var(--text);}  /* the active item is the only one on a surface */
+.tnode.sel i{color:var(--text) !important;}
+.tnode .chev{color:var(--text4);}
+.tnode i.ico{color:var(--text3);}
+.tchildren{border-left:none;margin-left:12px;padding-left:4px;}
+
+#center{background:var(--card);border-radius:var(--r-card);overflow:hidden;padding:0 6px 6px;}
+#listhead{background:transparent;border-bottom:none;padding:12px 10px 8px;
+  font-family:var(--font);font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--text3);}
+#list{font-family:var(--mono);font-size:13px;padding:0;}
+#empty{color:var(--text4);font-family:var(--font);}
+
+/* A file row: flat on the card while unticked, dropped into the hollow when
+   ticked. The surface says "this one", no colour spent on it. */
+.row{border:none;border-left:none;border-radius:var(--r-field);padding:6px 10px;margin-bottom:2px;
+  background:transparent;}
+.row.alt{background:transparent;}
+.row:hover{background:rgba(255,255,255,.025);}
+.row .cur{color:var(--text3);}
+.row .cur i{color:var(--text4);}
+.row .nw{color:var(--text2);}
+.row.sel,.row.sel.alt{background:var(--ins);border-left:none;}
+.row.sel .cur{color:var(--text);}
+.row.sel .cur i{color:var(--text3);}
+/* Current name = the source, new name = the destination: in the family's code,
+   what gets written is green. */
+.row .nw .chg,.row.sel .nw .chg{color:var(--green);font-weight:600;}
+.row.conflict,.row.conflict.alt{background:rgba(242,85,90,.08);border-left:none;}
+.row.conflict .nw{color:var(--red);}
+.row.conflict .cur{color:var(--text);}
+/* Keyboard focus ring: only while the keyboard is actually in the list. */
+#list:focus-within .row.focus,#list:focus .row.focus{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+.row.focus{box-shadow:none;}
+
+/* Checkbox: an outline in the hollow, a green tick when on. */
+.cbox{width:15px;height:15px;border:none;border-radius:var(--r-badge);background:transparent;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.2);position:relative;}
+.cbox.on{background:var(--green);box-shadow:none;}
+.cbox.on::after{content:'';position:absolute;left:5px;top:2px;width:4px;height:8px;background:none;
+  border:solid var(--page);border-width:0 2px 2px 0;border-radius:0;transform:rotate(45deg);}
+
+/* 5 ── The rules: every rule is a card on the page, 12 px apart ──────────── */
+#modules{background:transparent;border-top:none;padding:0 12px;gap:12px;}
+.mcard,.mcard.on{background:var(--card);border:none;border-radius:var(--r-card);padding:11px 13px 12px;}
+.mhead{gap:10px;margin-bottom:9px;}
+.clean-bar .mhead{margin-bottom:0;}
+.mtitle{display:inline-block;font-family:var(--font);font-size:15px;font-weight:600;letter-spacing:-.2px;
+  color:var(--text3);text-transform:lowercase;}
+.mtitle::first-letter{text-transform:uppercase;}
+.mcard.on .mtitle{color:var(--text);}
+.clean-desc,.mcard.on .clean-desc{font-size:11.5px;color:var(--text3);margin-left:4px;}
+
+/* Switch: 34 x 20, knob 14. On = green, knob right. Off = hollow, knob grey left. */
+.sw{width:34px;height:20px;border-radius:20px;background:var(--ins);box-shadow:inset 0 0 0 1px rgba(255,255,255,.09);}
+.sw .kn{width:14px;height:14px;top:3px;left:3px;background:#5c6270;}
+.sw.on{background:var(--green);box-shadow:none;}
+.sw.on .kn{left:17px;background:var(--text);}
+
+/* Field label: 10/700 capitals, fixed 12 px height so two columns stay aligned. */
+.flab,.mcard.on .flab{display:flex;align-items:center;height:12px;line-height:12px;gap:6px;
+  font-family:var(--font);font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:6px;}
+.frow{gap:8px;}
+
+/* Field: a hollow, never an outlined box. Name fragments are file-name material,
+   so they stay in the fixed-width face. */
+.fld{background:var(--ins);border:none;border-radius:var(--r-field);padding:7px 10px;
+  font-family:var(--mono);font-size:13px;color:var(--text);}
+.fld::placeholder{color:var(--text4);}
+.fld:focus{border:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+.fld.bad,.fld.bad:focus{border:none;box-shadow:inset 0 0 0 1px var(--red);color:var(--red);}
+select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;padding-right:26px;}
+.hint,.mcard.on .hint{font-size:11.5px;color:var(--text3);}
+.hint.err,.mcard.on .hint.err{color:var(--red);}
+
+/* Stepper: one hollow with − value + inside, no seams. */
+.stepper{background:var(--ins);border-radius:var(--r-field);}
+.stepbtn,.stepper .stepbtn:first-child,.stepper .stepbtn:last-child{background:transparent;border:none;
+  border-radius:var(--r-field);width:26px;color:var(--text3);font-size:15px;}
+.stepbtn:hover{color:var(--text);border:none;}
+.stepper .stepfld{background:transparent;border-radius:0;padding-left:0;padding-right:0;}
+.stepper .stepfld:focus{box-shadow:none;}
+.stepper:focus-within{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+
+/* Two-way choice: the options lie flat, the chosen one sits in the hollow. */
+.seg{border:none;border-radius:var(--r-field);gap:2px;font-family:var(--font);font-size:11.5px;overflow:visible;margin-top:0;}
+.seg span{border-radius:var(--r-field);padding:8px 4px;line-height:15px;color:var(--text3);font-weight:600;}
+.seg span:hover{color:var(--text2);}
+.seg span.active{background:var(--ins);color:var(--text);}
+
+.chk-inline{color:var(--text2);font-size:12px;gap:8px;margin-top:8px;}
+/* Match case / Ignore case live in their card header, on the right: one line less per card. */
+.mhead .chk-inline{margin:0 0 0 auto;font-size:11.5px;color:var(--text3);gap:7px;}
+
+/* 6 ── Footer: status on the left, the main action full width in the centre ── */
+#footer{background:var(--page);border-top:none;height:68px;padding:0 16px 4px;
+  grid-template-columns:1fr minmax(320px,1.3fr) 1fr;gap:16px;}
+#status{font-family:var(--font);font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.foot-meta .fm-ver{color:var(--text4);font-family:var(--mono);}
+.foot-meta .fm-sep{color:var(--text4);}
+.foot-meta .fm-link{color:var(--text3);}
+.foot-meta .fm-link:hover{color:var(--text);text-decoration:none;}
+
+/* Main action: full width, radius 14, background tinted with its state colour. */
+#btn-rename{width:100%;justify-self:stretch;background:#0f2c1d;color:var(--green);border:none;
+  border-radius:var(--r-card);padding:14px;font-family:var(--font);font-size:15px;font-weight:700;
+  letter-spacing:.08em;box-shadow:none;animation:none;transition:background .15s;}
+#btn-rename i{font-size:17px;}
+#btn-rename:not([disabled]):hover{background:#133a26;animation:none;box-shadow:none;}
+#btn-rename[disabled]{background:var(--card);color:var(--text4);box-shadow:none;}
+/* Quiet button, on the page: sits on a card-coloured pad. */
+.btn{background:var(--card);border:none;border-radius:9px;padding:8px 14px;color:var(--text2);
+  font-family:var(--font);font-size:12px;font-weight:600;}
+.btn:hover{color:var(--text);border:none;background:var(--raise);}
+
+/* 7 ── What floats: toast, windows ───────────────────────────────────────── */
+#toast{background:var(--raise);border:none;border-radius:12px;padding:10px 16px;font-family:var(--font);
+  font-size:12.5px;color:var(--text);box-shadow:0 18px 44px rgba(0,0,0,.6);bottom:90px;}
+#update-ov,#about-ov{background:rgba(0,0,0,.7);}
+.upd-card{width:380px;background:var(--card);border:none;border-radius:18px;padding:22px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);}
+.upd-h{font-family:var(--font);font-size:18px;font-weight:600;letter-spacing:-.3px;color:var(--text);margin-bottom:6px;}
+.upd-sub{font-size:12.5px;color:var(--text3);line-height:1.55;margin-bottom:16px;}
+.upd-links a{color:var(--text2);font-size:12px;}
+.upd-links a:hover{color:var(--text);text-decoration:none;}
+.upd-actions{gap:8px;}
+.upd-actions .upd-btn{flex:1;}
+.upd-btn{background:var(--ins);border:none;border-radius:9px;padding:10px 14px;color:var(--text2);
+  font-family:var(--font);font-size:12.5px;font-weight:600;}
+.upd-btn:hover{color:var(--text);border:none;background:var(--raise);}
+.upd-go,.upd-go:hover{background:#0f2c1d;color:var(--green);}
+.upd-go:hover{background:#133a26;}
+/* ═══ end of the charter block ═══ */
 </style>
 </head>
 <body>
@@ -229,20 +459,20 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
   <button class="tbbtn" id="btn-reveal" title="Reveal current folder in Finder"><i class="ti ti-folder-open"></i>Finder</button>
   <button class="tbbtn" id="btn-refresh" title="Refresh"><i class="ti ti-refresh"></i>Refresh</button>
   <div class="winctl">
-    <button class="wc" id="wc-min" title="Minimize"><i class="ti ti-minus"></i></button>
-    <button class="wc" id="wc-max" title="Maximize"><i class="ti ti-square"></i></button>
-    <button class="wc wc-close" id="wc-close" title="Close"><i class="ti ti-x"></i></button>
+    <button class="wc" id="wc-min" title="Minimize" aria-label="Minimize"><i class="ti ti-minus"></i></button>
+    <button class="wc" id="wc-max" title="Maximize" aria-label="Maximize"><i class="ti ti-square"></i></button>
+    <button class="wc wc-close" id="wc-close" title="Close" aria-label="Close"><i class="ti ti-x"></i></button>
   </div>
 </div>
 
 <div id="pathbar">
-  <span class="up" id="btn-up" title="Up one level"><i class="ti ti-arrow-up"></i></span>
+  <span class="up" id="btn-up" role="button" tabindex="0" title="Up one level" aria-label="Up one level"><i class="ti ti-arrow-up"></i></span>
   <span id="crumbs"></span>
   <div class="pbtools">
     <span class="filterwrap" id="filterwrap">
       <i class="ti ti-search"></i>
       <input id="flt" type="text" placeholder="Filter" spellcheck="false" title="Filter the list (Cmd/Ctrl+F, Esc to clear)" />
-      <button class="fclear" id="flt-clear" title="Clear filter"><i class="ti ti-x"></i></button>
+      <button class="fclear" id="flt-clear" title="Clear filter" aria-label="Clear filter"><i class="ti ti-x"></i></button>
     </span>
     <select id="sort-key" title="Sort the list">
       <option value="name">Name</option>
@@ -251,19 +481,19 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
       <option value="size">Size</option>
       <option value="ext">Type</option>
     </select>
-    <button id="sort-dir" title="Ascending / descending"><i class="ti ti-sort-ascending"></i></button>
+    <button id="sort-dir" title="Ascending / descending" aria-label="Sort direction"><i class="ti ti-sort-ascending"></i></button>
   </div>
 </div>
 
 <div id="main">
   <div id="sidebar">
-    <div class="hd"><span>DISKS</span><button class="hd-refresh" id="disks-refresh" title="Refresh disks"><i class="ti ti-refresh"></i></button></div>
+    <div class="hd"><span>DISKS</span><button class="hd-refresh" id="disks-refresh" title="Refresh disks" aria-label="Refresh disks"><i class="ti ti-refresh"></i></button></div>
     <div id="tree"></div>
   </div>
   <div id="resizer" title="Drag to resize"></div>
   <div id="center">
     <div id="listhead">
-      <span class="chk"><span class="cbox" id="chk-all" title="Select all / none"></span></span>
+      <span class="chk"><span class="cbox" id="chk-all" role="checkbox" title="Select all / none" aria-label="Select all"></span></span>
       <span>CURRENT NAME</span>
       <span>NEW NAME</span>
       <span></span>
@@ -285,8 +515,8 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
   <!-- REMOVE -->
   <div class="mcard" id="card-remove">
     <div class="mhead"><span class="sw" data-sw="remove"><span class="kn"></span></span><span class="mtitle">REMOVE</span></div>
-    <div class="fcol"><div class="flab">Remove string</div><input class="fld" id="rm-str" /></div>
-    <div class="frow" style="margin-top:6px;">
+    <div class="frow">
+      <div class="fcol" style="flex:1.25;"><div class="flab">String</div><input class="fld" id="rm-str" /></div>
       <div class="fcol"><div class="flab">First</div>
         <div class="stepper">
           <button type="button" class="stepbtn" data-target="rm-first" data-delta="-1" aria-label="Decrease first">&minus;</button>
@@ -305,12 +535,11 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
   </div>
   <!-- REPLACE -->
   <div class="mcard" id="card-replace">
-    <div class="mhead"><span class="sw" data-sw="replace"><span class="kn"></span></span><span class="mtitle">REPLACE</span></div>
+    <div class="mhead"><span class="sw" data-sw="replace"><span class="kn"></span></span><span class="mtitle">REPLACE</span><span class="chk-inline" id="rp-case-wrap"><span class="cbox" id="rp-case"></span>Match case</span></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Search</div><input class="fld" id="rp-search" /></div>
       <div class="fcol"><div class="flab">Replace</div><input class="fld" id="rp-replace" /></div>
     </div>
-    <div class="chk-inline" id="rp-case-wrap"><span class="cbox" id="rp-case"></span>Match case</div>
   </div>
   <!-- INSERT -->
   <div class="mcard" id="card-insert">
@@ -331,14 +560,13 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
   </div>
   <!-- REGEX -->
   <div class="mcard" id="card-regex">
-    <div class="mhead"><span class="sw" data-sw="regex"><span class="kn"></span></span><span class="mtitle">REGEX</span></div>
+    <div class="mhead"><span class="sw" data-sw="regex"><span class="kn"></span></span><span class="mtitle">REGEX</span><span class="chk-inline" id="rx-icase-wrap"><span class="cbox" id="rx-icase"></span>Ignore case</span></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Pattern</div><input class="fld" id="rx-pattern" spellcheck="false" placeholder="(\d{4})-(\d{2})"
            title="JavaScript regular expression, applied to the name without its extension." /></div>
       <div class="fcol"><div class="flab">Replace</div><input class="fld" id="rx-replace" spellcheck="false" placeholder="$2_$1"
            title="Replacement text. Use $1, $2… to reuse capture groups." /></div>
     </div>
-    <div class="chk-inline" id="rx-icase-wrap"><span class="cbox" id="rx-icase"></span>Ignore case</div>
     <div class="hint err" id="rx-hint" style="display:none;"></div>
   </div>
   <!-- CASE -->
@@ -365,7 +593,7 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
       <div class="flab">New extension</div><input class="fld" id="ex-newext" placeholder="mp4" />
     </div>
   </div>
-  <!-- DATE / TIME -->
+  <!-- DATE / TIME : two rows instead of three, so the file list keeps its height -->
   <div class="mcard" id="card-datetime">
     <div class="mhead"><span class="sw" data-sw="datetime"><span class="kn"></span></span><span class="mtitle">DATE / TIME</span></div>
     <div class="frow">
@@ -376,8 +604,11 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
           <option value="modified">Date modified</option>
         </select>
       </div>
+      <div class="fcol"><div class="flab">Position</div>
+        <div class="seg" id="dt-pos"><span data-v="start" class="active">Start</span><span data-v="end">End</span></div>
+      </div>
     </div>
-    <div class="flab" style="margin-top:6px;">Format</div>
+    <div class="flab" style="margin-top:8px;">Format</div>
     <select class="fld" id="dt-preset">
       <option value="YYYY-MM-DD">YYYY-MM-DD</option>
       <option value="YYYYMMDD">YYYYMMDD</option>
@@ -387,10 +618,8 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
       <option value="hh-mm-ss">HH-MM-SS</option>
       <option value="YYYY.MM.DD">YYYY.MM.DD</option>
     </select>
-    <div class="flab" style="margin-top:6px;">Position</div>
-    <div class="seg" id="dt-pos"><span data-v="start" class="active">Start</span><span data-v="end">End</span></div>
   </div>
-  <!-- NUMBERING -->
+  <!-- NUMBERING : two rows instead of three -->
   <div class="mcard" id="card-numbering">
     <div class="mhead"><span class="sw" data-sw="numbering"><span class="kn"></span></span><span class="mtitle">NUMBERING</span></div>
     <div class="frow">
@@ -408,8 +637,6 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
           <button type="button" class="stepbtn" data-target="nb-inc" data-delta="1" aria-label="Increase step">+</button>
         </div>
       </div>
-    </div>
-    <div class="frow" style="margin-top:6px;">
       <div class="fcol"><div class="flab">Padding</div>
         <div class="stepper">
           <button type="button" class="stepbtn" data-target="nb-pad" data-delta="-1" aria-label="Decrease padding">&minus;</button>
@@ -417,10 +644,13 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
           <button type="button" class="stepbtn" data-target="nb-pad" data-delta="1" aria-label="Increase padding">+</button>
         </div>
       </div>
-      <div class="fcol"><div class="flab">Sep.</div><input class="fld" id="nb-sep" value="_" /></div>
     </div>
-    <div class="flab" style="margin-top:6px;">Position</div>
-    <div class="seg" id="nb-pos"><span data-v="start">Start</span><span data-v="end" class="active">End</span></div>
+    <div class="frow" style="margin-top:8px;">
+      <div class="fcol" style="flex:0 0 64px;"><div class="flab">Sep.</div><input class="fld" id="nb-sep" value="_" /></div>
+      <div class="fcol"><div class="flab">Position</div>
+        <div class="seg" id="nb-pos"><span data-v="start">Start</span><span data-v="end" class="active">End</span></div>
+      </div>
+    </div>
   </div>
   <!-- CLEAN -->
   <div class="mcard clean-bar" id="card-clean">
@@ -436,7 +666,7 @@ select.fld{cursor:pointer;-webkit-appearance:none;appearance:none;
   <div class="foot-left">
     <span id="status">No selection</span>
     <div class="foot-meta">
-      <span class="fm-ver" id="fm-ver">v1.6.1</span>
+      <span class="fm-ver" id="fm-ver">v1.6.2</span>
       <span class="fm-sep">·</span>
       <a class="fm-link" id="lnk-github">github</a>
       <span class="fm-sep">·</span>
@@ -716,9 +946,12 @@ function updateFooter(){
   const sel = computed.length;                       // selected AND visible
   const hidden = selected.size - sel;                // selected but hidden by the filter
   if(sel===0){ st.textContent = hidden ? hidden+' selected, hidden by the filter' : 'No selection'; }
-  else st.innerHTML = sel+' selected · '+okCount+' to rename'
-      + (conflicts? ' · <span class="conf">'+conflicts+' conflict'+(conflicts>1?'s':'')+'</span>':'')
-      + (hidden? ' · '+hidden+' hidden':'');
+  // One badge template for every count; the colour carries the meaning
+  // (green = will be written, red = cannot be, orange = hidden from view).
+  else st.innerHTML = '<span>'+sel+' selected</span>'
+      + '<span class="badge b-green">'+okCount+' TO RENAME</span>'
+      + (conflicts? '<span class="badge b-red">'+conflicts+' CONFLICT'+(conflicts>1?'S':'')+'</span>':'')
+      + (hidden? '<span class="badge b-orange">'+hidden+' HIDDEN</span>':'');
   document.getElementById('btn-rename').disabled = okCount===0;
   document.getElementById('btn-undo').disabled = !lastUndo;
 }
@@ -961,6 +1194,7 @@ function refreshSortUI(){
   const b=document.getElementById('sort-dir');
   b.innerHTML = '<i class="ti ti-sort-'+(sortDir>0?'ascending':'descending')+'"></i>';
   b.title = sortDir>0 ? 'Ascending — click for descending' : 'Descending — click for ascending';
+  b.setAttribute('aria-label', sortDir>0 ? 'Sort ascending' : 'Sort descending');
 }
 document.getElementById('sort-key').addEventListener('change', e=>{
   sortKey = e.target.value; applyView(); recompute();
@@ -1123,7 +1357,11 @@ function showAbout(){
   actions.appendChild(close);
   card.appendChild(h); card.appendChild(sub); card.appendChild(links); card.appendChild(actions);
   ov.appendChild(card); document.body.appendChild(ov);
-  const dismiss=()=>ov.remove();
+  // This window only informs, so Escape closes it (charter). The update notice
+  // carries a choice and keeps its buttons.
+  const onKey=(e)=>{ if(e.key==='Escape'){ e.preventDefault(); dismiss(); } };
+  const dismiss=()=>{ document.removeEventListener('keydown', onKey, true); ov.remove(); };
+  document.addEventListener('keydown', onKey, true);
   close.onclick=dismiss;
   ov.onclick=(e)=>{ if(e.target===ov) dismiss(); };
 }
