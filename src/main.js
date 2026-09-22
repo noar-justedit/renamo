@@ -232,43 +232,32 @@ ipcMain.handle('read-dir', async (_e, dirPath) => {
 });
 
 // ---------------------------------------------------------------------------
-// Batch rename, two-phase to avoid in-batch collisions / cycles
-// pairs: [{ from, to }] absolute paths in the same directory
+// Batch rename. All file operations live in rename-engine.js, which only ever
+// renames: it never deletes, never overwrites, never hides a file, checks each
+// rename and stops at the first anomaly. Its journal sits in the app's own
+// data folder, never next to the user's files.
 // ---------------------------------------------------------------------------
-ipcMain.handle('rename-batch', async (_e, pairs) => {
-  const done = [];
-  const failed = [];
-  const undo = [];
-  const stage = [];
+const { createEngine } = require('./rename-engine');
+let engine = null;
+function getEngine() {
+  if (!engine) engine = createEngine({ journalPath: path.join(app.getPath('userData'), 'rename-journal.json') });
+  return engine;
+}
 
-  // Phase 1: move each source to a unique temp name
-  for (let i = 0; i < pairs.length; i++) {
-    const { from, to } = pairs[i];
-    const dir = path.dirname(from);
-    const tmp = path.join(dir, `.renamo_tmp_${process.pid}_${i}_${Date.now()}`);
-    try {
-      fs.renameSync(from, tmp);
-      stage.push({ tmp, to, from });
-    } catch (err) {
-      failed.push({ from, to, error: String(err.message || err) });
-    }
-  }
+ipcMain.handle('rename-batch', async (_e, pairs) => getEngine().renameBatch(Array.isArray(pairs) ? pairs : []));
 
-  // Phase 2: move temp to final name
-  for (const s of stage) {
-    try {
-      if (fs.existsSync(s.to)) throw new Error('target already exists');
-      fs.renameSync(s.tmp, s.to);
-      done.push({ from: s.from, to: s.to });
-      undo.push({ from: s.to, to: s.from });
-    } catch (err) {
-      // roll this one back to its original name
-      try { fs.renameSync(s.tmp, s.from); } catch (e2) {}
-      failed.push({ from: s.from, to: s.to, error: String(err.message || err) });
-    }
-  }
+// Files left behind by an interrupted rename (hidden ones included).
+ipcMain.handle('scan-leftovers', async (_e, dir) => {
+  try { return getEngine().findLeftovers(dir); } catch (e) { return []; }
+});
+ipcMain.handle('recover-leftovers', async (_e, dir) => getEngine().recoverLeftovers(dir));
 
-  return { ok: failed.length === 0, done, failed, undo };
+// A batch that never reached its end (crash, power cut, forced quit).
+ipcMain.handle('unfinished-batch', async () => {
+  const j = getEngine().readJournal();
+  if (!j || j.finished) return null;
+  const dirs = [...new Set((j.ops || []).filter(o => o.state !== 'done').map(o => path.dirname(o.from)))];
+  return { startedAt: j.startedAt, dirs, count: (j.ops || []).filter(o => o.state !== 'done').length };
 });
 
 // ---------------------------------------------------------------------------

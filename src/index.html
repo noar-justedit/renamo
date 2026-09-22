@@ -433,7 +433,8 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
 /* 7 ── What floats: toast, windows ───────────────────────────────────────── */
 #toast{background:var(--raise);border:none;border-radius:12px;padding:10px 16px;font-family:var(--font);
   font-size:12.5px;color:var(--text);box-shadow:0 18px 44px rgba(0,0,0,.6);bottom:90px;}
-#update-ov,#about-ov{background:rgba(0,0,0,.7);}
+#update-ov,#about-ov,#report-ov{background:rgba(0,0,0,.7);}
+#report-ov{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;-webkit-app-region:no-drag;}
 .upd-card{width:380px;background:var(--card);border:none;border-radius:18px;padding:22px;
   box-shadow:0 30px 80px rgba(0,0,0,.6);}
 .upd-h{font-family:var(--font);font-size:18px;font-weight:600;letter-spacing:-.3px;color:var(--text);margin-bottom:6px;}
@@ -447,6 +448,20 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
 .upd-btn:hover{color:var(--text);border:none;background:var(--raise);}
 .upd-go,.upd-go:hover{background:#0f2c1d;color:var(--green);}
 .upd-go:hover{background:#133a26;}
+/* Files left behind by an interrupted rename: something is missing from view, so orange. */
+#leftovers{display:flex;align-items:center;gap:10px;margin:0 4px 8px;padding:9px 12px;border-radius:var(--r-field);
+  background:rgba(242,160,61,.10);color:var(--orange);font-family:var(--font);font-size:12.5px;}
+#leftovers i{font-size:16px;flex:none;}
+#leftovers span{flex:1;min-width:0;color:var(--text);}
+#leftovers .btn{background:rgba(242,160,61,.16);color:var(--orange);}
+.rep-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin:0 0 16px;
+  scrollbar-width:thin;scrollbar-color:#2a2d36 transparent;}
+.rep-row{background:var(--ins);border-radius:var(--r-field);padding:8px 10px;font-size:12px;}
+.rep-row .rn{font-family:var(--mono);color:var(--text);word-break:break-all;}
+.rep-row .rw{color:var(--text3);margin-top:3px;}
+.rep-row .rw b{color:var(--text2);font-weight:600;}
+.rep-row.lost .rw b{color:var(--red);}
+.upd-card.wide{width:520px;}
 /* ═══ end of the charter block ═══ */
 </style>
 </head>
@@ -497,6 +512,10 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
       <span>CURRENT NAME</span>
       <span>NEW NAME</span>
       <span></span>
+    </div>
+    <div id="leftovers" style="display:none;" role="alert">
+      <i class="ti ti-alert-triangle"></i><span id="lo-text"></span>
+      <button class="btn" id="lo-recover">Bring them back</button>
     </div>
     <div id="list" tabindex="0"></div>
     <div id="empty" style="display:none;">Select a disk or folder to begin.</div>
@@ -666,7 +685,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   <div class="foot-left">
     <span id="status">No selection</span>
     <div class="foot-meta">
-      <span class="fm-ver" id="fm-ver">v1.6.2</span>
+      <span class="fm-ver" id="fm-ver">v1.6.3</span>
       <span class="fm-sep">·</span>
       <a class="fm-link" id="lnk-github">github</a>
       <span class="fm-sep">·</span>
@@ -1054,6 +1073,7 @@ async function openDir(p){
   focusIndex = -1; applyView();
   focusIndex = entries.length ? 0 : -1;
   renderCrumbs(); await revealInTree(p); recompute();
+  checkLeftovers(p);
 }
 function renderCrumbs(){
   const c = document.getElementById('crumbs');
@@ -1094,17 +1114,90 @@ async function doRename(){
   document.getElementById('btn-rename').disabled = true;
   const res = await api.renameBatch(pairs);
   lastUndo = (res.undo && res.undo.length) ? res.undo : null;
-  const okN=res.done.length, failN=res.failed.length;
   await openDir(currentDir);
   selected = new Set(res.done.map(d=>d.to)); recompute();
-  toast(okN+' renamed'+(failN?(' · '+failN+' failed'):''));
+  reportBatch(res, 'renamed');
 }
 async function doUndo(){
   if(!lastUndo) return;
   const res = await api.renameBatch(lastUndo);
   lastUndo = null; await openDir(currentDir);
   selected = new Set(res.done.map(d=>d.to)); recompute();
-  toast('Undone');
+  reportBatch(res, 'restored');
+}
+
+// ---- after a batch: a toast when all went well, a full report otherwise ----
+// Every file that was not renamed is listed with the reason and, above all,
+// where it is right now. Nothing is ever left unaccounted for.
+function reportBatch(res, verb){
+  const okN = res.done.length, failed = res.failed || [];
+  if(!failed.length){ toast(okN+' '+verb); return; }
+  const base = p => p ? api.basename(p) : null;
+  const rows = failed.map(f => ({
+    name: base(f.from)+'  \u2192  '+base(f.to),
+    why: f.error,
+    now: f.now ? (f.now===f.from ? 'still under its original name' : 'now named '+base(f.now)) : 'could not be found - check the folder on the server',
+    lost: !f.now,
+  }));
+  const title = res.halted ? 'renamo stopped the batch' : failed.length+' file'+(failed.length>1?'s were':' was')+' not '+verb;
+  const sub = res.halted
+    ? 'A file could not be found under its new name right after being renamed, so renamo touched nothing else. '+okN+' file'+(okN===1?' was':'s were')+' '+verb+' before that.'
+    : okN+' file'+(okN===1?' was':'s were')+' '+verb+'. The others were left untouched:';
+  showReport(title, sub, rows);
+}
+function showReport(title, sub, rows, actions){
+  const old=document.getElementById('report-ov'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='report-ov'; ov.className='rep-ov';
+  const card=document.createElement('div'); card.className='upd-card wide';
+  const h=document.createElement('div'); h.className='upd-h'; h.textContent=title;
+  const p=document.createElement('div'); p.className='upd-sub'; p.textContent=sub;
+  card.appendChild(h); card.appendChild(p);
+  if(rows && rows.length){
+    const list=document.createElement('div'); list.className='rep-list';
+    rows.forEach(r=>{ const row=document.createElement('div'); row.className='rep-row'+(r.lost?' lost':'');
+      const n=document.createElement('div'); n.className='rn'; n.textContent=r.name;
+      const w=document.createElement('div'); w.className='rw';
+      const b=document.createElement('b'); b.textContent=r.now; w.appendChild(b);
+      if(r.why){ w.appendChild(document.createTextNode(' \u00b7 '+r.why)); }
+      row.appendChild(n); row.appendChild(w); list.appendChild(row); });
+    card.appendChild(list);
+  }
+  const act=document.createElement('div'); act.className='upd-actions';
+  (actions||[{label:'OK'}]).forEach(a=>{ const btn=document.createElement('button');
+    btn.className='upd-btn'+(a.go?' upd-go':''); btn.textContent=a.label;
+    btn.onclick=()=>{ close(); if(a.run) a.run(); }; act.appendChild(btn); });
+  card.appendChild(act); ov.appendChild(card); document.body.appendChild(ov);
+  const onKey=(e)=>{ if(e.key==='Escape'){ e.preventDefault(); close(); } };
+  function close(){ document.removeEventListener('keydown', onKey, true); ov.remove(); }
+  document.addEventListener('keydown', onKey, true);
+}
+
+// ---- leftovers of an interrupted rename ----
+// Looks in the folder for files a batch left under a temporary name,
+// including the hidden ones written by renamo up to 1.6.2.
+let leftovers = [];
+async function checkLeftovers(dir){
+  const box=document.getElementById('leftovers');
+  try { leftovers = (api.scanLeftovers ? await api.scanLeftovers(dir) : []) || []; } catch(e){ leftovers = []; }
+  if(dir!==currentDir) return;
+  if(!leftovers.length){ box.style.display='none'; return; }
+  const legacy = leftovers.filter(l=>l.kind==='legacy').length;
+  document.getElementById('lo-text').textContent =
+    leftovers.length+' file'+(leftovers.length>1?'s':'')+' left here by an interrupted rename'
+    + (legacy ? ' ('+legacy+' hidden by an older renamo)' : '') + '.';
+  box.style.display='flex';
+}
+async function recoverHere(){
+  if(!currentDir) return;
+  const res = await api.recoverLeftovers(currentDir);
+  await openDir(currentDir);
+  const base = p => api.basename(p);
+  const rows = res.restored.map(r=>({ name: base(r.to), now: 'back in view', why: 'was '+base(r.from) }))
+    .concat(res.failed.map(f=>({ name: base(f.from), now: 'left as it is', why: f.error, lost:false })));
+  const legacyNote = res.restored.some(r=>/^RECOVERED_/.test(base(r.to)))
+    ? ' Files hidden by renamo up to 1.6.2 had lost their name: they are numbered in the order of the batch, with the extension read from their content.'
+    : '';
+  showReport(res.restored.length+' file'+(res.restored.length===1?'':'s')+' brought back', 'Nothing was deleted or overwritten.'+legacyNote, rows);
 }
 
 let toastT=null;
@@ -1240,6 +1333,7 @@ window.addEventListener('drop', async e=>{
 });
 
 document.getElementById('btn-rename').addEventListener('click', doRename);
+document.getElementById('lo-recover').addEventListener('click', recoverHere);
 document.getElementById('btn-undo').addEventListener('click', doUndo);
 document.getElementById('btn-refresh').addEventListener('click', ()=>{ if(currentDir) openDir(currentDir); else loadVolumes(); });
 document.getElementById('disks-refresh').addEventListener('click', async ()=>{
@@ -1366,6 +1460,16 @@ function showAbout(){
   ov.onclick=(e)=>{ if(e.target===ov) dismiss(); };
 }
 (async()=>{
+  // A batch that never finished (crash, power cut): say so and lead to the folder.
+  try{
+    const u = api.unfinishedBatch ? await api.unfinishedBatch() : null;
+    if(u && u.count){
+      showReport('A rename was interrupted',
+        u.count+' file'+(u.count>1?'s':'')+' of the last batch did not reach their new name. Open the folder to check it: files left under a temporary name can be brought back from there.',
+        u.dirs.map(d=>({ name:d, now:'folder to check' })),
+        [{label:'Later'},{label:'Open the folder', go:true, run:()=>openDir(u.dirs[0])}]);
+    }
+  }catch(e){}
   try{ appVersion=await api.getVersion(); }catch(e){}
   try{ api.onUpdateAvailable(showUpdateNotice); }catch(e){}
   const fmv=document.getElementById('fm-ver'); if(fmv&&appVersion) fmv.textContent='v'+appVersion;

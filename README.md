@@ -16,8 +16,10 @@ macOS and Windows. Built with Electron. No dependencies, no sign-up.
 - Sort the list by name, date created, date modified, size or type — numbering follows that order
 - Filter the list (Cmd/Ctrl+F); hidden rows are never renamed
 - Range selection with shift-click or shift+arrows, select all with Cmd/Ctrl+A
-- Live preview with the changed part shown in red and name-collision detection
-- Two-phase rename with one-click undo of the last batch
+- Live preview with the changed part shown in green and name-collision detection
+- Safe renaming: renamo only ever renames. It never deletes, never overwrites and never hides a file,
+  checks every rename and stops at the first anomaly, with a report of where each file is
+- One-click undo of the last batch, and recovery of files left behind by an interrupted rename
 - Resizable disk browser, full keyboard navigation
 
 ### Rule order
