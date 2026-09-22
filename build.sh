@@ -162,15 +162,38 @@ run_tests() {
   npm test
 }
 
+# electron-builder keeps the NSIS toolkit in a cache. If a download or an
+# unpacking was ever cut short, the cache is left incomplete and every Windows
+# build then stops on a missing file (typically elevate.exe). When that exact
+# error shows up, the cache folder is moved aside - kept, not deleted - so a
+# fresh copy is downloaded, and the build runs once more.
+EB_CACHE="${ELECTRON_BUILDER_CACHE:-$HOME/Library/Caches/electron-builder}"
+run_win_build() {
+  local log; log=$(mktemp -t renamo-winbuild.XXXXXX)
+  if npx electron-builder "$@" 2>&1 | tee "$log"; then return 0; fi
+  if grep -q "ENOENT" "$log" && grep -qE "electron-builder/nsis|elevate\.exe" "$log"; then
+    local stamp; stamp=$(date +%Y%m%d-%H%M%S)
+    step "The NSIS cache of electron-builder is incomplete. Setting it aside and retrying..."
+    for d in "$EB_CACHE"/nsis*; do
+      [ -e "$d" ] || continue
+      case "$d" in *.broken-*) continue ;; esac
+      mv "$d" "$d.broken-$stamp" && info "moved aside: $d.broken-$stamp"
+    done
+    npx electron-builder "$@"
+    return $?
+  fi
+  return 1
+}
+
 build_windows() {
   step "Building Windows (x64)..."
   if command -v wine >/dev/null 2>&1 || command -v wine64 >/dev/null 2>&1; then
-    npx electron-builder --win nsis zip --x64
+    run_win_build --win nsis zip --x64 || die "the Windows build failed. Read the message above."
   else
     info "Wine is not installed, so the .exe installer cannot be assembled here."
     info "To get it:  brew install --cask wine-stable"
     info "Building the portable .zip instead..."
-    npx electron-builder --win zip --x64
+    run_win_build --win zip --x64 || die "the Windows build failed. Read the message above."
   fi
 }
 
@@ -215,8 +238,28 @@ fi
 install_deps
 run_tests
 
-# Start from a clean dist/ so the summary only lists this build.
-rm -rf dist
+# Only one build at a time: two builds running together in the same folder
+# overwrite each other's files, and the macOS one then fails to find its app.
+LOCK=".build.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  OTHER=$(cat "$LOCK/pid" 2>/dev/null || true)
+  if [ -n "$OTHER" ] && kill -0 "$OTHER" 2>/dev/null; then
+    die "another build is already running in this folder (process $OTHER). Wait for it to finish."
+  fi
+  info "A previous build was interrupted; taking over its lock."
+fi
+echo $$ > "$LOCK/pid"
+trap 'rm -rf "$LOCK"' EXIT
+
+# Clear only the output of the platform being built: a Windows build leaves the
+# Mac DMG in dist/ untouched, and the other way round.
+mkdir -p dist
+if [ "$DO_MAC" = "1" ]; then
+  rm -rf dist/mac-arm64 dist/mac dist/*-mac-*.dmg dist/*-mac-*.dmg.blockmap
+fi
+if [ "$DO_WIN" = "1" ]; then
+  rm -rf dist/win-unpacked dist/*.exe dist/*.exe.blockmap dist/*-win-*.zip dist/latest.yml
+fi
 
 DMG="dist/$APP-$VERSION-mac-arm64.dmg"
 APP_PATH="dist/mac-arm64/$APP.app"
@@ -289,6 +332,6 @@ fi
 if [ "$DO_WIN" = "1" ]; then
   printf '\n'
   info "Windows (unsigned, SmartScreen shows a warning):"
-  ls -1 dist/*.exe dist/*win*.zip 2>/dev/null | sed 's/^/    /' || info "  (check dist/)"
+  ls -1 dist/*"$VERSION"*.exe dist/*"$VERSION"-win-*.zip 2>/dev/null | sed 's/^/    /' || info "  (check dist/)"
 fi
 printf '\n'

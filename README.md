@@ -62,6 +62,10 @@ tests, signing, notarization, stapling and verification:
 npm test                   rename-engine checks alone, no build
 ```
 
+Each build only replaces the files of the platform it builds, so a Windows build
+keeps the Mac DMG in `dist/` and the other way round. Two builds cannot run at the
+same time in the same folder: the second one stops and says so.
+
 `build-win.sh` still exists for a Windows-only build without touching build.sh.
 The scripts are committed with the executable bit set; if your copy came from an
 archive that dropped it, restore it once with `chmod +x *.sh`.
