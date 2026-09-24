@@ -15,15 +15,34 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const https = require('https');
 
+// Folder listings are sorted once with one collator (creating the comparison
+// options for every pair made a 10 000-file sort 15 times slower).
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+// Run `fn` over `list` with at most `limit` calls in flight. On a network share
+// each stat is a round trip: 48 at a time instead of one after the other.
+async function mapLimit(list, limit, fn) {
+  const out = new Array(list.length);
+  let next = 0;
+  const worker = async () => { while (next < list.length) { const k = next++; out[k] = await fn(list[k], k); } };
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+  return out;
+}
+
+const isStr = v => typeof v === 'string' && v.length > 0;
+
 // ── Update check — reads renamo's own version.json hosted on GitHub ──
-// Never blocks startup, fails silently on any network/TLS issue.
+// Asked for by the window (which can turn it off), never blocks, fails
+// silently. The answer only ever leads to a web page: nothing is downloaded.
 const UPDATE_URL = 'https://raw.githubusercontent.com/noar-justedit/renamo/main/version.json';
+const FALLBACK_URL = 'https://github.com/noar-justedit/renamo/releases';
+const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
 function semverGt(a, b){
   const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
   const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
@@ -34,9 +53,12 @@ function semverGt(a, b){
   }
   return false;
 }
+function isHttpsUrl(u) {
+  try { return new URL(String(u)).protocol === 'https:'; } catch (e) { return false; }
+}
 // GET a URL following up to 3 redirects (https.get does NOT follow them itself).
 function fetchFollow(url, hops, cb){
-  if (hops > 3) return cb(null);
+  if (hops > 3 || !isHttpsUrl(url)) return cb(null);
   try {
     const req = https.get(url, { timeout: 4000 }, (res) => {
       if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location){
@@ -46,7 +68,7 @@ function fetchFollow(url, hops, cb){
       }
       if (res.statusCode !== 200){ res.resume(); return cb(null); }
       let body = '';
-      res.on('data', c => body += c);
+      res.on('data', c => { body += c; if (body.length > 64 * 1024) req.destroy(); });
       res.on('end', () => cb(body));
     });
     req.on('timeout', () => req.destroy());
@@ -54,16 +76,17 @@ function fetchFollow(url, hops, cb){
   } catch(e){ cb(null); }
 }
 function checkForUpdate(){
-  fetchFollow(UPDATE_URL, 0, (body) => {
-    if (!body) return;
-    let data; try { data = JSON.parse(body); } catch(e){ return; }
-    // Dedicated version.json: { "version": "x.y.z", "url": "..." }.
-    // Also accept a nested "renamo" object for backward compatibility.
-    const info = (data && data.version) ? data : (data && data.renamo) ? data.renamo : null;
-    if (!info || !info.version) return;
-    if (semverGt(info.version, app.getVersion()) && win && !win.isDestroyed()){
-      win.webContents.send('update-available', { version: info.version, url: info.url || 'https://www.just-edit.fr' });
-    }
+  return new Promise(resolve => {
+    fetchFollow(UPDATE_URL, 0, (body) => {
+      if (!body) return resolve(null);
+      let data; try { data = JSON.parse(body); } catch(e){ return resolve(null); }
+      // Dedicated version.json: { "version": "x.y.z", "url": "..." }.
+      // Also accept a nested "renamo" object for backward compatibility.
+      const info = (data && data.version) ? data : (data && data.renamo) ? data.renamo : null;
+      if (!info || !VERSION_RE.test(String(info.version))) return resolve(null);
+      if (!semverGt(info.version, app.getVersion())) return resolve(null);
+      resolve({ version: String(info.version), url: isHttpsUrl(info.url) ? String(info.url) : FALLBACK_URL });
+    });
   });
 }
 
@@ -88,21 +111,39 @@ function parseWinDrives(psOutput){
   return out;
 }
 
+// The application menu. No developer tools and no reload in the shipped app:
+// they would give direct access to the rename commands, and a reload drops the
+// current batch. macOS keeps its Edit menu, which copy and paste rely on.
+function buildMenu() {
+  const dev = app.isPackaged ? [] : [{ type: 'separator' }, { role: 'reload' }, { role: 'toggleDevTools' }];
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: 'appMenu' },
+      { role: 'editMenu' },
+      { label: 'View', submenu: [{ role: 'togglefullscreen' }, ...dev] },
+      { role: 'windowMenu' },
+    ]));
+  } else {
+    Menu.setApplicationMenu(dev.length ? Menu.buildFromTemplate([{ label: 'Dev', submenu: dev.slice(1) }]) : null);
+  }
+}
+
 let win;
 
 function createWindow() {
   const isMac = process.platform === 'darwin';
-  const isWin = process.platform === 'win32';
   const opts = {
     width: 1180,
     height: 820,
     minWidth: 940,
     minHeight: 620,
-    backgroundColor: '#16161a',
+    backgroundColor: '#0a0b0e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      devTools: !app.isPackaged,
     },
   };
   if (isMac) {
@@ -113,8 +154,12 @@ function createWindow() {
     opts.frame = false;
   }
   win = new BrowserWindow(opts);
+  // The window only ever shows renamo's own page: no pop-up, no navigation.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+  win.webContents.on('will-redirect', (e) => e.preventDefault());
+  win.webContents.on('will-attach-webview', (e) => e.preventDefault());
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.webContents.once('did-finish-load', () => { setTimeout(checkForUpdate, 1500); });
 }
 
 // Custom window controls (used on Windows/Linux frameless windows)
@@ -122,11 +167,18 @@ ipcMain.handle('win-min', (e) => { const w = BrowserWindow.fromWebContents(e.sen
 ipcMain.handle('win-max', (e) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) { w.isMaximized() ? w.unmaximize() : w.maximize(); } });
 ipcMain.handle('win-close', (e) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.close(); });
 
-// Update-check support: open the download page in the default browser, expose the app version.
-ipcMain.handle('open-external', async (_e, url) => { try { await shell.openExternal(url); } catch(e){} return true; });
+// Open a web page in the default browser. https only: this handler must never
+// become a way to launch a file or another application.
+ipcMain.handle('open-external', async (_e, url) => {
+  if (!isHttpsUrl(url)) return false;
+  try { await shell.openExternal(String(url)); } catch(e){ return false; }
+  return true;
+});
 ipcMain.handle('get-version', () => app.getVersion());
+ipcMain.handle('check-update', () => checkForUpdate());
 
 app.whenReady().then(() => {
+  buildMenu();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -135,6 +187,12 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// A defence in depth: whatever window is created, it gets the same guards.
+app.on('web-contents-created', (_e, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.on('will-navigate', (e) => e.preventDefault());
 });
 
 // ---------------------------------------------------------------------------
@@ -192,40 +250,43 @@ ipcMain.handle('list-volumes', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Read a directory
+// Read a directory. Asynchronous, with the stats run 48 at a time: on a NAS a
+// folder of 10 000 files no longer freezes the window for seconds. With
+// { dirsOnly: true } (the disk tree) files are not even looked at.
 // ---------------------------------------------------------------------------
-ipcMain.handle('read-dir', async (_e, dirPath) => {
+ipcMain.handle('read-dir', async (_e, dirPath, opts) => {
+  if (!isStr(dirPath)) return { ok: false, error: 'invalid path' };
+  const dirsOnly = !!(opts && opts.dirsOnly);
   try {
-    const dirents = fs.readdirSync(dirPath, { withFileTypes: true });
-    const entries = [];
-    for (const d of dirents) {
-      if (d.name.startsWith('.')) continue;
+    const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    let visible = dirents.filter(d => !d.name.startsWith('.'));
+    if (dirsOnly) visible = visible.filter(d => !d.isFile());
+    const rows = await mapLimit(visible, 48, async (d) => {
       const full = path.join(dirPath, d.name);
-      let isDir = d.isDirectory();
-      let st = null;
-      try {
-        st = fs.statSync(full);
-        if (d.isSymbolicLink()) isDir = st.isDirectory();
-      } catch (err) {
-        continue;
-      }
+      if (dirsOnly && d.isDirectory()) return { name: d.name, path: full, isDir: true, ext: '', size: 0, birthtimeMs: 0, mtimeMs: 0 };
+      let st;
+      try { st = await fs.promises.stat(full); } catch (err) { return null; }
+      const isDir = st.isDirectory();
+      if (dirsOnly && !isDir) return null;
       const dot = d.name.lastIndexOf('.');
-      const ext = (!isDir && dot > 0) ? d.name.slice(dot + 1) : '';
-      entries.push({
+      return {
         name: d.name,
         path: full,
         isDir,
-        ext,
-        size: st ? st.size : 0,
-        birthtimeMs: st ? st.birthtimeMs : 0,
-        mtimeMs: st ? st.mtimeMs : 0,
-      });
-    }
-    entries.sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        ext: (!isDir && dot > 0) ? d.name.slice(dot + 1) : '',
+        size: st.size,
+        // 0 when the volume does not record a creation date (most NAS shares,
+        // Linux): the window then says so instead of silently using today.
+        birthtimeMs: st.birthtimeMs > 0 ? st.birthtimeMs : 0,
+        mtimeMs: st.mtimeMs,
+      };
     });
-    return { ok: true, entries };
+    const entries = rows.filter(Boolean);
+    entries.sort((a, b) => (a.isDir !== b.isDir) ? (a.isDir ? -1 : 1) : collator.compare(a.name, b.name));
+    // Leftovers of an interrupted rename, found in the same listing (hidden
+    // names included) instead of reading the folder a second time.
+    const leftovers = dirsOnly ? [] : getEngine().leftoversFrom(dirPath, dirents.map(d => d.name));
+    return { ok: true, entries, leftovers };
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
   }
@@ -233,9 +294,10 @@ ipcMain.handle('read-dir', async (_e, dirPath) => {
 
 // ---------------------------------------------------------------------------
 // Batch rename. All file operations live in rename-engine.js, which only ever
-// renames: it never deletes, never overwrites, never hides a file, checks each
-// rename and stops at the first anomaly. Its journal sits in the app's own
-// data folder, never next to the user's files.
+// renames: it never deletes, never overwrites, never hides a file, renames a
+// file only inside its own folder, checks each rename and stops at the first
+// anomaly. Its journal sits in the app's own data folder, never next to the
+// user's files.
 // ---------------------------------------------------------------------------
 const { createEngine } = require('./rename-engine');
 let engine = null;
@@ -244,30 +306,42 @@ function getEngine() {
   return engine;
 }
 
-ipcMain.handle('rename-batch', async (_e, pairs) => getEngine().renameBatch(Array.isArray(pairs) ? pairs : []));
+// Whatever goes wrong, the window gets an answer it can show: never a silent
+// rejected promise that leaves the Rename button dead.
+ipcMain.handle('rename-batch', async (_e, pairs) => {
+  const list = Array.isArray(pairs) ? pairs.filter(p => p && typeof p === 'object').map(p => ({ from: p.from, to: p.to })) : [];
+  try { return getEngine().renameBatch(list); }
+  catch (err) { return { ok: false, error: String(err.message || err), done: [], failed: [], undo: [], halted: true }; }
+});
 
 // Files left behind by an interrupted rename (hidden ones included).
 ipcMain.handle('scan-leftovers', async (_e, dir) => {
+  if (!isStr(dir)) return [];
   try { return getEngine().findLeftovers(dir); } catch (e) { return []; }
 });
-ipcMain.handle('recover-leftovers', async (_e, dir) => getEngine().recoverLeftovers(dir));
+ipcMain.handle('recover-leftovers', async (_e, dir) => {
+  if (!isStr(dir)) return { restored: [], failed: [], error: 'invalid path' };
+  try { return getEngine().recoverLeftovers(dir); }
+  catch (err) { return { restored: [], failed: [], error: String(err.message || err) }; }
+});
 
 // A batch that never reached its end (crash, power cut, forced quit).
 ipcMain.handle('unfinished-batch', async () => {
   const j = getEngine().readJournal();
   if (!j || j.finished) return null;
-  const dirs = [...new Set((j.ops || []).filter(o => o.state !== 'done').map(o => path.dirname(o.from)))];
-  return { startedAt: j.startedAt, dirs, count: (j.ops || []).filter(o => o.state !== 'done').length };
+  const pending = (j.ops || []).filter(o => o.state !== 'done');
+  const dirs = [...new Set(pending.map(o => path.dirname(o.from)))];
+  return { startedAt: j.startedAt, dirs, count: pending.length };
 });
 
 // ---------------------------------------------------------------------------
 // Stat a list of paths (used by drag & drop to tell folders from files)
 // ---------------------------------------------------------------------------
 ipcMain.handle('stat-paths', async (_e, paths) => {
-  const list = Array.isArray(paths) ? paths : [];
-  return list.map((p) => {
+  const list = Array.isArray(paths) ? paths.filter(isStr) : [];
+  return mapLimit(list, 32, async (p) => {
     try {
-      const st = fs.statSync(p);
+      const st = await fs.promises.stat(p);
       return { path: p, exists: true, isDir: st.isDirectory() };
     } catch (err) {
       return { path: p, exists: false, isDir: false };
@@ -276,6 +350,7 @@ ipcMain.handle('stat-paths', async (_e, paths) => {
 });
 
 ipcMain.handle('reveal', async (_e, p) => {
+  if (!isStr(p)) return { ok: false, error: 'invalid path' };
   try { shell.showItemInFolder(p); return { ok: true }; }
   catch (err) { return { ok: false, error: String(err) }; }
 });

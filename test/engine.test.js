@@ -21,7 +21,7 @@ const src = html.slice(html.indexOf('\n', start) + 1, end);
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(src, ctx);
-const { buildName, applyCase, cleanStr, compileRegex, splitName } = ctx;
+const { buildName, applyCase, cleanStr, compileRegex, splitName, nameProblem } = ctx;
 
 // Every rule off by default; each test switches on only what it needs.
 function S(over){
@@ -140,6 +140,29 @@ t('separators are stripped from the result', () => {
 });
 t('CLEAN strips accents and spaces', () => {
   assert.strictEqual(cleanStr('Été à Paris (final)'), 'Ete_a_Paris_final');
+});
+
+
+// ── 1.6.4 ──────────────────────────────────────────────────────────────────
+t('a rule that empties the name is refused: the file would be hidden', () => {
+  const s = S({ remove: { on: true, first: 4 } });
+  const nn = buildName(file('clip.mov'), 0, s);
+  assert.strictEqual(nn, '.mov');
+  assert.ok(/hidden/.test(nameProblem(nn)));
+  assert.ok(nameProblem(buildName(file('Фото.jpg'), 0, S({ clean: { on: true } }))));
+});
+t('names Windows refuses are flagged', () => {
+  for (const n of ['a:b.mov', 'what?.mov', 'x<y', 'end.', 'end ', 'CON', 'nul.txt', 'LPT1.mov']) assert.ok(nameProblem(n), n);
+  for (const n of ['console.mov', 'A001C001_V2.mov', 'été.mov']) assert.strictEqual(nameProblem(n), null, n);
+  assert.ok(nameProblem('é'.repeat(130) + '.mov'), 'a name over 255 bytes passed');
+});
+t('EXTENSION "Replace with" gives an extension to a file without one, never to a folder', () => {
+  const s = S({ extension: { on: true, mode: 'replace', newExt: 'txt' } });
+  assert.strictEqual(buildName(file('README'), 0, s), 'README.txt');
+  assert.strictEqual(buildName({ name: 'Folder.2024', isDir: true }, 0, s), 'Folder.2024');
+});
+t('the new name comes out in NFC', () => {
+  assert.strictEqual(buildName(file('Cafe\u0301.mov'), 0, S({ add: { on: true, suffix: '_e\u0301' } })), 'Caf\u00e9_\u00e9.mov');
 });
 
 console.log(passed + ' checks passed' + (process.exitCode ? ' — with failures above' : ''));

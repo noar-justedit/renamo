@@ -462,6 +462,80 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
 .rep-row .rw b{color:var(--text2);font-weight:600;}
 .rep-row.lost .rw b{color:var(--red);}
 .upd-card.wide{width:520px;}
+/* 8 ── 1.6.4 · keyboard, alignment, the virtual list ───────────────────── */
+/* Controls are real buttons now, so the keyboard reaches them: reset what a
+   button brings by default. */
+button.sw,button.cbox,button.chk-inline,.seg button,button.fm-link,button.set-row,#pathbar button.up{
+  border:none;padding:0;margin:0;font:inherit;-webkit-app-region:no-drag;}
+button.chk-inline{background:transparent;cursor:pointer;display:inline-flex;align-items:center;}
+button.fm-link{background:transparent;font-family:var(--font);font-size:11px;line-height:1;}
+.chk-inline.on .cbox{background:var(--green);box-shadow:none;}
+.chk-inline.on .cbox::after{content:'';position:absolute;left:5px;top:2px;width:4px;height:8px;background:none;
+  border:solid var(--page);border-width:0 2px 2px 0;border-radius:0;transform:rotate(45deg);}
+.cbox:hover,.chk-inline:hover .cbox{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.34);}
+.cbox.on:hover,.chk-inline.on:hover .cbox{box-shadow:none;}
+.sw .kn{background:var(--text4);}
+.sw.on .kn{background:var(--text);}
+/* Two-way choice, as buttons: flat, the chosen one in the hollow, hover lifts. */
+.seg button{flex:1;text-align:center;background:transparent;border-radius:var(--r-field);padding:8px 4px;line-height:15px;
+  color:var(--text3);font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;}
+.seg button:hover{background:var(--raise);color:var(--text2);}
+.seg button.active{background:var(--ins);color:var(--text);}
+
+/* Keyboard focus: the charter ring, on every control, only for the keyboard. */
+button:focus{outline:none;}
+.btn:focus-visible,.tbbtn:focus-visible,.upd-btn:focus-visible,.wc:focus-visible,.stepbtn:focus-visible,
+.icobtn:focus-visible,#pathbar .up:focus-visible,#sort-dir:focus-visible,.hd-refresh:focus-visible,
+.fclear:focus-visible,.seg button:focus-visible,#btn-rename:focus-visible,button.fm-link:focus-visible{
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+button.sw:focus-visible,button.cbox:focus-visible,button.chk-inline:focus-visible,button.set-row:focus-visible{
+  outline:1px solid rgba(255,255,255,.18);outline-offset:3px;border-radius:var(--r-badge);}
+button.sw:focus-visible{border-radius:20px;}
+
+/* Dropping files on the window: neutral information, so blue - never the accent. */
+body.dropping #main{box-shadow:none;}
+body.dropping #center{box-shadow:inset 0 0 0 2px var(--blue);}
+
+/* Footer: in line with the cards above (12 px), and it never clips its text. */
+#footer{padding:0 12px 4px;height:auto;min-height:68px;}
+.foot-left{min-width:0;max-width:100%;}
+#status{flex-wrap:nowrap;white-space:nowrap;overflow:hidden;min-width:0;}
+#status > span:first-child{overflow:hidden;text-overflow:ellipsis;}
+/* One disabled look for both footer buttons: the pad stays, the text dims. */
+.btn[disabled],#btn-rename[disabled]{opacity:1;background:var(--card);color:var(--text4);cursor:default;}
+/* The main action in sentence case, like every other label. */
+#btn-rename{text-transform:none;letter-spacing:0;}
+
+/* One hover for every line of a list: it lifts to the floating surface. */
+.row:hover{background:var(--raise);}
+.row.sel:hover{background:var(--ins);}
+.row.conflict:hover{background:rgba(242,85,90,.12);}
+
+/* Hollows take the hollow radius (11); fields keep 8. */
+.row,.tnode,#leftovers,.rep-row{border-radius:var(--r-ins);}
+
+/* The virtual list: only the rows on screen exist, laid out on a fixed step. */
+#list{position:relative;}
+#vspace{position:relative;width:100%;}
+.row{position:absolute;left:0;right:0;height:30px;margin:0;padding:0 10px;}
+.row .cur .nm{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.row .st[title]{cursor:help;}
+
+/* Breadcrumb: the current folder always shows; a fade says the start is cut. */
+#crumbs.ovf{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 32px);mask-image:linear-gradient(90deg,transparent 0,#000 32px);}
+
+/* Disk tree: long names end with an ellipsis, no sideways scrolling. */
+#sidebar{overflow-x:hidden;}
+.tnode{min-width:0;overflow:hidden;}
+.tnode .tname{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+
+/* Leftovers banner: in line with the file rows, keeps its orange on hover. */
+#leftovers{margin:0 0 8px;}
+#leftovers .btn:hover{background:rgba(242,160,61,.26);color:var(--orange);}
+
+/* About window: the update setting. */
+button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);border-radius:var(--r-ins);
+  padding:10px 12px;margin:0 0 16px;font-size:12.5px;color:var(--text2);cursor:pointer;width:100%;text-align:left;}
 /* ═══ end of the charter block ═══ */
 </style>
 </head>
@@ -471,7 +545,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   <img src="appicon.png" alt="renamo" />
   <span class="word">renamo</span>
   <span style="flex:1"></span>
-  <button class="tbbtn" id="btn-reveal" title="Reveal current folder in Finder"><i class="ti ti-folder-open"></i>Finder</button>
+  <button class="tbbtn" id="btn-reveal" title="Show the current folder in Finder"><i class="ti ti-folder-open"></i><span id="reveal-label">Finder</span></button>
   <button class="tbbtn" id="btn-refresh" title="Refresh"><i class="ti ti-refresh"></i>Refresh</button>
   <div class="winctl">
     <button class="wc" id="wc-min" title="Minimize" aria-label="Minimize"><i class="ti ti-minus"></i></button>
@@ -481,7 +555,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
 </div>
 
 <div id="pathbar">
-  <span class="up" id="btn-up" role="button" tabindex="0" title="Up one level" aria-label="Up one level"><i class="ti ti-arrow-up"></i></span>
+  <button type="button" class="up" id="btn-up" title="Up one level" aria-label="Up one level"><i class="ti ti-arrow-up"></i></button>
   <span id="crumbs"></span>
   <div class="pbtools">
     <span class="filterwrap" id="filterwrap">
@@ -508,7 +582,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   <div id="resizer" title="Drag to resize"></div>
   <div id="center">
     <div id="listhead">
-      <span class="chk"><span class="cbox" id="chk-all" role="checkbox" title="Select all / none" aria-label="Select all"></span></span>
+      <span class="chk"><button type="button" class="cbox" id="chk-all" role="checkbox" aria-checked="false" title="Select all / none" aria-label="Select all"></button></span>
       <span>CURRENT NAME</span>
       <span>NEW NAME</span>
       <span></span>
@@ -517,7 +591,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
       <i class="ti ti-alert-triangle"></i><span id="lo-text"></span>
       <button class="btn" id="lo-recover">Bring them back</button>
     </div>
-    <div id="list" tabindex="0"></div>
+    <div id="list" tabindex="0" aria-label="Files"><div id="vspace"></div></div>
     <div id="empty" style="display:none;">Select a disk or folder to begin.</div>
   </div>
 </div>
@@ -525,7 +599,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
 <div id="modules">
   <!-- ADD -->
   <div class="mcard" id="card-add">
-    <div class="mhead"><span class="sw" data-sw="add"><span class="kn"></span></span><span class="mtitle">ADD</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="add" role="switch" aria-checked="false" aria-label="Add rule"><span class="kn"></span></button><span class="mtitle">ADD</span></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Prefix</div><input class="fld" id="add-prefix" /></div>
       <div class="fcol"><div class="flab">Suffix</div><input class="fld" id="add-suffix" /></div>
@@ -533,7 +607,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   </div>
   <!-- REMOVE -->
   <div class="mcard" id="card-remove">
-    <div class="mhead"><span class="sw" data-sw="remove"><span class="kn"></span></span><span class="mtitle">REMOVE</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="remove" role="switch" aria-checked="false" aria-label="Remove rule"><span class="kn"></span></button><span class="mtitle">REMOVE</span></div>
     <div class="frow">
       <div class="fcol" style="flex:1.25;"><div class="flab">String</div><input class="fld" id="rm-str" /></div>
       <div class="fcol"><div class="flab">First</div>
@@ -554,7 +628,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   </div>
   <!-- REPLACE -->
   <div class="mcard" id="card-replace">
-    <div class="mhead"><span class="sw" data-sw="replace"><span class="kn"></span></span><span class="mtitle">REPLACE</span><span class="chk-inline" id="rp-case-wrap"><span class="cbox" id="rp-case"></span>Match case</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="replace" role="switch" aria-checked="false" aria-label="Replace rule"><span class="kn"></span></button><span class="mtitle">REPLACE</span><button type="button" class="chk-inline" id="rp-case" role="checkbox" aria-checked="false"><span class="cbox"></span>Match case</button></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Search</div><input class="fld" id="rp-search" /></div>
       <div class="fcol"><div class="flab">Replace</div><input class="fld" id="rp-replace" /></div>
@@ -562,7 +636,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   </div>
   <!-- INSERT -->
   <div class="mcard" id="card-insert">
-    <div class="mhead"><span class="sw" data-sw="insert"><span class="kn"></span></span><span class="mtitle">INSERT</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="insert" role="switch" aria-checked="false" aria-label="Insert rule"><span class="kn"></span></button><span class="mtitle">INSERT</span></div>
     <div class="frow">
       <div class="fcol" style="flex:2.2"><div class="flab">String</div><input class="fld" id="ins-str" /></div>
       <div class="fcol" style="flex:1.3"><div class="flab">Position</div>
@@ -573,13 +647,13 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
         </div>
       </div>
       <div class="fcol" style="flex:1.2"><div class="flab">From</div>
-        <div class="seg" id="ins-dir"><span data-v="start" class="active">Start</span><span data-v="end">End</span></div>
+        <div class="seg" id="ins-dir" role="radiogroup" aria-label="Insert from"><button type="button" role="radio" aria-checked="true" data-v="start" class="active">Start</button><button type="button" role="radio" aria-checked="false" data-v="end">End</button></div>
       </div>
     </div>
   </div>
   <!-- REGEX -->
   <div class="mcard" id="card-regex">
-    <div class="mhead"><span class="sw" data-sw="regex"><span class="kn"></span></span><span class="mtitle">REGEX</span><span class="chk-inline" id="rx-icase-wrap"><span class="cbox" id="rx-icase"></span>Ignore case</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="regex" role="switch" aria-checked="false" aria-label="Regex rule"><span class="kn"></span></button><span class="mtitle">REGEX</span><button type="button" class="chk-inline" id="rx-icase" role="checkbox" aria-checked="false"><span class="cbox"></span>Ignore case</button></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Pattern</div><input class="fld" id="rx-pattern" spellcheck="false" placeholder="(\d{4})-(\d{2})"
            title="JavaScript regular expression, applied to the name without its extension." /></div>
@@ -590,7 +664,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   </div>
   <!-- CASE -->
   <div class="mcard" id="card-case">
-    <div class="mhead"><span class="sw" data-sw="case"><span class="kn"></span></span><span class="mtitle">CASE</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="case" role="switch" aria-checked="false" aria-label="Case rule"><span class="kn"></span></button><span class="mtitle">CASE</span></div>
     <div class="flab">Mode</div>
     <select class="fld" id="cs-mode">
       <option value="lower">lowercase</option>
@@ -601,7 +675,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   </div>
   <!-- EXTENSION -->
   <div class="mcard" id="card-extension">
-    <div class="mhead"><span class="sw" data-sw="extension"><span class="kn"></span></span><span class="mtitle">EXTENSION</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="extension" role="switch" aria-checked="false" aria-label="Extension rule"><span class="kn"></span></button><span class="mtitle">EXTENSION</span></div>
     <div class="flab">Mode</div>
     <select class="fld" id="ex-mode">
       <option value="lower">Lowercase</option>
@@ -610,11 +684,12 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
     </select>
     <div class="fcol" id="ex-newext-wrap" style="margin-top:6px;display:none;">
       <div class="flab">New extension</div><input class="fld" id="ex-newext" placeholder="mp4" />
+      <div class="hint">Files without an extension get this one. Folders keep their name.</div>
     </div>
   </div>
   <!-- DATE / TIME : two rows instead of three, so the file list keeps its height -->
   <div class="mcard" id="card-datetime">
-    <div class="mhead"><span class="sw" data-sw="datetime"><span class="kn"></span></span><span class="mtitle">DATE / TIME</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="datetime" role="switch" aria-checked="false" aria-label="Date / Time rule"><span class="kn"></span></button><span class="mtitle">DATE / TIME</span></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Source</div>
         <select class="fld" id="dt-source">
@@ -624,7 +699,7 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
         </select>
       </div>
       <div class="fcol"><div class="flab">Position</div>
-        <div class="seg" id="dt-pos"><span data-v="start" class="active">Start</span><span data-v="end">End</span></div>
+        <div class="seg" id="dt-pos" role="radiogroup" aria-label="Date position"><button type="button" role="radio" aria-checked="true" data-v="start" class="active">Start</button><button type="button" role="radio" aria-checked="false" data-v="end">End</button></div>
       </div>
     </div>
     <div class="flab" style="margin-top:8px;">Format</div>
@@ -637,10 +712,11 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
       <option value="hh-mm-ss">HH-MM-SS</option>
       <option value="YYYY.MM.DD">YYYY.MM.DD</option>
     </select>
+    <div class="hint err" id="dt-hint" style="display:none;"></div>
   </div>
   <!-- NUMBERING : two rows instead of three -->
   <div class="mcard" id="card-numbering">
-    <div class="mhead"><span class="sw" data-sw="numbering"><span class="kn"></span></span><span class="mtitle">NUMBERING</span></div>
+    <div class="mhead"><button type="button" class="sw" data-sw="numbering" role="switch" aria-checked="false" aria-label="Numbering rule"><span class="kn"></span></button><span class="mtitle">NUMBERING</span></div>
     <div class="frow">
       <div class="fcol"><div class="flab">Start</div>
         <div class="stepper">
@@ -667,14 +743,14 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
     <div class="frow" style="margin-top:8px;">
       <div class="fcol" style="flex:0 0 64px;"><div class="flab">Sep.</div><input class="fld" id="nb-sep" value="_" /></div>
       <div class="fcol"><div class="flab">Position</div>
-        <div class="seg" id="nb-pos"><span data-v="start">Start</span><span data-v="end" class="active">End</span></div>
+        <div class="seg" id="nb-pos" role="radiogroup" aria-label="Number position"><button type="button" role="radio" aria-checked="false" data-v="start">Start</button><button type="button" role="radio" aria-checked="true" data-v="end" class="active">End</button></div>
       </div>
     </div>
   </div>
   <!-- CLEAN -->
   <div class="mcard clean-bar" id="card-clean">
     <div class="mhead">
-      <span class="sw" data-sw="clean"><span class="kn"></span></span>
+      <button type="button" class="sw" data-sw="clean" role="switch" aria-checked="false" aria-label="Clean rule"><span class="kn"></span></button>
       <span class="mtitle">CLEAN</span>
       <span class="clean-desc">Strip accents and special characters, replace spaces with _</span>
     </div>
@@ -685,11 +761,11 @@ select.fld{background-color:var(--ins);font-family:var(--font);font-size:12.5px;
   <div class="foot-left">
     <span id="status">No selection</span>
     <div class="foot-meta">
-      <span class="fm-ver" id="fm-ver">v1.6.3</span>
+      <span class="fm-ver" id="fm-ver">v1.6.4</span>
       <span class="fm-sep">·</span>
-      <a class="fm-link" id="lnk-github">github</a>
+      <button type="button" class="fm-link" id="lnk-github">GitHub</button>
       <span class="fm-sep">·</span>
-      <a class="fm-link" id="lnk-about">about</a>
+      <button type="button" class="fm-link" id="lnk-about">About</button>
     </div>
   </div>
   <button id="btn-rename" disabled><i class="ti ti-check"></i>Rename</button>
@@ -706,14 +782,22 @@ let nodeIndex = new Map();
 let currentDir = null;
 let allEntries = [];      // everything read from the current folder
 let entries = [];         // the visible list: allEntries sorted, then filtered
+let sortedCache = null;   // allEntries sorted; rebuilt only when the folder or the sort changes
 let selected = new Set();
 let computed = [];
-let lastUndo = null;
+let compMap = new Map();  // path -> computed row
+let lastUndo = null;      // { dir, pairs } - the last batch, in the folder it ran in
 let focusIndex = -1;
-let anchorIndex = -1;     // shift-click range anchor
+let anchorIndex = -1;     // shift-click / shift-arrow range anchor
+let anchorPath = null;    // the anchor survives a sort or a filter by its path
+let rangeBase = null;     // what was ticked before the current shift-range began
 let sortKey = 'name';
 let sortDir = 1;          // 1 = ascending, -1 = descending
 let filterText = '';
+let openToken = 0;        // the last folder asked for wins, even if an older answer arrives later
+
+const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:'base'});
+const looseName = s => String(s).normalize('NFC').toLowerCase();
 
 // ---- rename engine ---- ENGINE-START (kept free of DOM access: see test/engine.test.js)
 function splitName(name, isDir){
@@ -730,7 +814,7 @@ function fmtDate(d,fmt){
             .split('hh').join(h).split('mm').join(m).split('ss').join(s);
 }
 function cleanStr(s){
-  s = s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  s = s.normalize('NFD').replace(/[̀-ͯ]/g,'');
   s = s.replace(/ /g,'_');
   s = s.replace(/[^A-Za-z0-9_.\-]/g,'');
   return s;
@@ -805,20 +889,36 @@ function buildName(item, index, S){
   }
   if(S.clean.on) base=cleanStr(base);
   const ex=S.extension;
-  if(ex.on && ext!==''){
+  // Folders have no extension. A file without one gets the new extension
+  // when the mode is "Replace with".
+  if(ex.on && !item.isDir){
     if(ex.mode==='lower') ext=ext.toLowerCase();
     else if(ex.mode==='upper') ext=ext.toUpperCase();
     else if(ex.mode==='replace') ext=(ex.newExt||'').replace(/^\.+/,'').trim();
   }
   let out = ext ? base+'.'+ext : base;
-  return out.replace(/[\\/]/g,'');
+  return out.replace(/[\\/]/g,'').normalize('NFC');
+}
+
+// What makes a new name unusable, in words - or null. Windows rules apply on
+// every platform: renamo's files travel between Mac, Windows and NAS shares.
+const WIN_RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$/i;
+function utf8Length(s){ try { return unescape(encodeURIComponent(s)).length; } catch(e){ return s.length*3; } }
+function nameProblem(nn){
+  if(nn==='' || nn==='.' || nn==='..') return 'The new name would be empty';
+  if(nn.charAt(0)==='.') return 'Nothing left before the extension: the file would be hidden';
+  if(/[<>:"|?*\u0000-\u001f]/.test(nn)) return 'Not allowed on Windows: < > : " | ? *';
+  if(/[ .]$/.test(nn)) return 'Not allowed on Windows: a name cannot end with a space or a dot';
+  if(WIN_RESERVED.test(nn)) return 'This name is reserved by Windows';
+  if(utf8Length(nn)>255) return 'The new name is too long (255 bytes at most)';
+  return null;
 }
 
 // ENGINE-END
 
 function gatherSettings(){
   const onOf = id => document.querySelector('.sw[data-sw="'+id+'"]').classList.contains('on');
-  const segVal = id => {const a=document.querySelector('#'+id+' span.active');return a?a.dataset.v:'end';};
+  const segVal = id => {const a=document.querySelector('#'+id+' .active');return a?a.dataset.v:'end';};
   const rxPattern = document.getElementById('rx-pattern').value;
   const rxIcase = document.getElementById('rx-icase').classList.contains('on');
   return {
@@ -848,32 +948,52 @@ function showRegexState(S){
   hint.textContent = bad ? 'Invalid regular expression — this rule is ignored.' : '';
 }
 
+// Typing in a rule field waits for a short pause before the preview is
+// rebuilt; a click rebuilds it at once. Anything that acts on the names
+// (Rename) flushes a pending rebuild first.
+let recomputeT = null;
+function scheduleRecompute(){ clearTimeout(recomputeT); recomputeT = setTimeout(()=>{ recomputeT=null; recompute(); }, 120); }
+function flushRecompute(){ if(recomputeT){ clearTimeout(recomputeT); recomputeT=null; recompute(); } }
+
 function recompute(){
+  if(recomputeT){ clearTimeout(recomputeT); recomputeT=null; }
   const S = gatherSettings();
   showRegexState(S);
   const selEntries = entries.filter(e => selected.has(e.path));
-  const idxMap = new Map(); selEntries.forEach((e,i)=>idxMap.set(e.path,i));
-  const lower = s => s.normalize('NFC').toLowerCase();
-  // Collision check runs against every sibling on disk, including rows hidden by the filter.
-  const siblingNames = new Set(allEntries.filter(e=>!selected.has(e.path)).map(e=>lower(e.name)));
+  // The collision check runs against every file of the folder that keeps its
+  // name - rows hidden by the filter included, ticked or not.
+  const renaming = new Set(selEntries.map(e=>e.path));
+  const siblingNames = new Set();
+  for(const e of allEntries) if(!renaming.has(e.path)) siblingNames.add(e._k);
   const targetCount = new Map();
-  const newNames = new Map();
+  const newNames = [];
+  selEntries.forEach((e,i)=>{
+    const nn = buildName(e, i, S);
+    const k = looseName(nn);
+    newNames.push([nn,k]);
+    targetCount.set(k, (targetCount.get(k)||0)+1);
+  });
+  const noBirth = S.datetime.on && S.datetime.source==='created';
+  let missingDates = 0;
   computed = [];
-  for(const e of selEntries){
-    const nn = buildName(e, idxMap.get(e.path), S);
-    newNames.set(e.path, nn);
-    targetCount.set(nn.toLowerCase(), (targetCount.get(nn.toLowerCase())||0)+1);
-  }
-  for(const e of selEntries){
-    const nn = newNames.get(e.path);
-    let status;
-    if(nn==='' || nn==='.' || nn==='..') status='conflict';
-    else if(lower(e.name)===nn.toLowerCase() && e.name.normalize('NFC')===nn) status='same';
-    else if(targetCount.get(nn.toLowerCase())>1) status='conflict';
-    else if(siblingNames.has(nn.toLowerCase())) status='conflict';
-    else status='ok';
-    computed.push({entry:e, newName:nn, status});
-  }
+  selEntries.forEach((e,i)=>{
+    const [nn,k] = newNames[i];
+    let status='ok', reason='';
+    const problem = nameProblem(nn);
+    if(noBirth && !e.birthtimeMs){ status='conflict'; reason='This volume does not record a creation date for this file. Use Date modified.'; missingDates++; }
+    else if(k===e._k && e.name.normalize('NFC')===nn){
+      status='same';
+      if(S.extension.on && e.isDir) reason='Folders have no extension';
+    }
+    else if(problem){ status='conflict'; reason=problem; }
+    else if(targetCount.get(k)>1){ status='conflict'; reason='Another file of the selection would get the same name'; }
+    else if(siblingNames.has(k)){ status='conflict'; reason='A file with this name is already in the folder'; }
+    computed.push({entry:e, newName:nn, status, reason});
+  });
+  compMap = new Map(computed.map(c=>[c.entry.path,c]));
+  const dh=document.getElementById('dt-hint');
+  dh.style.display = missingDates ? 'block' : 'none';
+  dh.textContent = missingDates ? missingDates+' file'+(missingDates>1?'s have':' has')+' no creation date on this volume.' : '';
   renderList();
   updateFooter();
 }
@@ -902,53 +1022,92 @@ function diffMarkup(oldName, newName){
   return out;
 }
 
-function rowView(e, i, compMap){
+// ---- the file list ----
+// Only the rows on screen exist in the page: a folder of 50 000 files draws
+// about forty rows. Rows are kept by position and updated in place, so a
+// re-render never destroys the row being clicked.
+const ROW_STEP = 32;           // 30 px row + 2 px gap, matches .row in the stylesheet
+const OVERSCAN = 8;
+const vRows = new Map();       // index -> row element
+function rowView(e, i){
   const isSel = selected.has(e.path);
   const c = compMap.get(e.path);
-  const base = 'row'+(i%2?' alt':'')+(i===focusIndex?' focus':'');
-  let cls=base, nwHtml='', stHtml='';
+  const base = 'row'+(i===focusIndex?' focus':'');
+  let cls=base, nwHtml='', stHtml='', reason='';
   if(isSel && c){
-    if(c.status==='conflict'){ cls='row conflict'+(i%2?' alt':'')+(i===focusIndex?' focus':''); nwHtml=esc(c.newName||'(empty)'); stHtml='<i class="ti ti-alert-triangle" style="color:var(--red)"></i>'; }
-    else if(c.status==='same'){ cls=base+' sel'; nwHtml=esc(c.newName); stHtml='<i class="ti ti-minus" style="color:var(--dim2)"></i>'; }
-    else { cls=base+' sel'; nwHtml=diffMarkup(e.name, c.newName); stHtml='<i class="ti ti-circle-check" style="color:var(--green)"></i>'; }
+    reason = c.reason || '';
+    if(c.status==='conflict'){ cls=base+' conflict'; nwHtml=esc(c.newName||'(empty)'); stHtml='<i class="ti ti-alert-triangle" style="color:var(--red)"></i>'; }
+    else if(c.status==='same'){ cls=base+' sel'; nwHtml=esc(c.newName); stHtml='<i class="ti ti-minus" style="color:var(--text3)"></i>'; }
+    else {
+      cls=base+' sel';
+      if(c.html===undefined) c.html=diffMarkup(e.name, c.newName);   // computed only for rows on screen
+      nwHtml=c.html; stHtml='<i class="ti ti-circle-check" style="color:var(--green)"></i>';
+    }
   }
-  return {isSel, cls, nwHtml, stHtml};
+  return {isSel, cls, nwHtml, stHtml, reason};
+}
+function makeRow(){
+  const row=document.createElement('div');
+  row.innerHTML='<span class="cbox" data-cb="1" aria-hidden="true"></span><span class="cell cur"><i class="ti"></i><span class="nm"></span></span><span class="cell nw"></span><span class="st"></span>';
+  return row;
+}
+function renderWindow(){
+  const list=document.getElementById('list'), space=document.getElementById('vspace');
+  const n=entries.length;
+  const top=list.scrollTop, h=list.clientHeight||600;
+  const first=Math.max(0, Math.floor(top/ROW_STEP)-OVERSCAN);
+  const last=Math.min(n-1, Math.ceil((top+h)/ROW_STEP)+OVERSCAN);
+  for(const [i,el] of vRows){ if(i<first || i>last){ el.remove(); vRows.delete(i); } }
+  for(let i=first;i<=last;i++){
+    const e=entries[i]; if(!e) continue;
+    let el=vRows.get(i);
+    if(!el){ el=makeRow(); el.style.top=(i*ROW_STEP)+'px'; space.appendChild(el); vRows.set(i,el); }
+    const v=rowView(e,i);
+    const sig=e.path+'\u0000'+v.cls+'\u0000'+(v.isSel?1:0)+'\u0000'+v.nwHtml+'\u0000'+v.stHtml+'\u0000'+v.reason;
+    if(el._sig===sig) continue;
+    const newEntry = el.dataset.path!==e.path;
+    el._sig=sig;
+    el.className=v.cls;
+    if(newEntry){
+      el.dataset.path=e.path; el.dataset.dir=e.isDir?'1':'0';
+      el.querySelector('.cur i').className='ti '+(e.isDir ? 'ti-folder' : iconFor(e.ext));
+      const nm=el.querySelector('.nm'); nm.textContent=e.name; el.title='';
+    }
+    el.dataset.i=String(i);
+    el.querySelector('.cbox').classList.toggle('on', v.isSel);
+    const nw=el.querySelector('.nw'); if(nw.innerHTML!==v.nwHtml) nw.innerHTML=v.nwHtml;
+    const st=el.querySelector('.st'); if(st.innerHTML!==v.stHtml) st.innerHTML=v.stHtml;
+    if(v.reason) st.title=v.reason; else st.removeAttribute('title');
+  }
 }
 function renderList(){
   const list = document.getElementById('list');
+  const space = document.getElementById('vspace');
   const empty = document.getElementById('empty');
-  if(!currentDir){ list.innerHTML=''; empty.style.display='flex'; empty.textContent='Select a disk or folder to begin.'; return; }
-  if(entries.length===0){ list.innerHTML=''; empty.style.display='flex'; empty.textContent='This folder is empty.'; return; }
-  empty.style.display='none';
-  const compMap = new Map(computed.map(c=>[c.entry.path,c]));
-  // Update existing rows in place when the entry set is unchanged, so that a
-  // re-render triggered mid-click (e.g. an input blur firing 'change') does not
-  // destroy the node being clicked and swallow the click.
-  const sameSet = list.children.length===entries.length
-    && entries.every((e,i)=> list.children[i] && list.children[i].dataset.path===e.path);
-  if(!sameSet){
-    let html='';
-    entries.forEach((e,i)=>{
-      const v=rowView(e,i,compMap);
-      const ico = e.isDir ? 'ti-folder' : iconFor(e.ext);
-      html += '<div class="'+v.cls+'" data-path="'+esc(e.path)+'" data-dir="'+(e.isDir?1:0)+'" data-i="'+i+'">'
-        + '<span class="cbox'+(v.isSel?' on':'')+'" data-cb="1"></span>'
-        + '<span class="cell cur"><i class="ti '+ico+'"></i>'+esc(e.name)+'</span>'
-        + '<span class="cell nw">'+v.nwHtml+'</span>'
-        + '<span class="st">'+v.stHtml+'</span></div>';
-    });
-    list.innerHTML = html;
+  const n = currentDir ? entries.length : 0;
+  space.style.height = (n*ROW_STEP)+'px';
+  if(!currentDir || n===0){
+    for(const [,el] of vRows) el.remove(); vRows.clear();
+    empty.style.display='flex';
+    empty.textContent = !currentDir ? 'Select a disk or folder to begin.'
+      : (allEntries.length ? 'No file matches the filter.' : 'This folder is empty.');
   } else {
-    entries.forEach((e,i)=>{
-      const v=rowView(e,i,compMap); const row=list.children[i];
-      if(row.className!==v.cls) row.className=v.cls;
-      row.querySelector('.cbox').classList.toggle('on', v.isSel);
-      const nw=row.querySelector('.nw'); if(nw.innerHTML!==v.nwHtml) nw.innerHTML=v.nwHtml;
-      const st=row.querySelector('.st'); if(st.innerHTML!==v.stHtml) st.innerHTML=v.stHtml;
-    });
+    empty.style.display='none';
+    renderWindow();
   }
-  document.getElementById('chk-all').classList.toggle('on', entries.length>0 && entries.every(e=>selected.has(e.path)));
+  const all = n>0 && entries.every(e=>selected.has(e.path));
+  const ca=document.getElementById('chk-all');
+  ca.classList.toggle('on', all);
+  ca.setAttribute('aria-checked', all ? 'true' : 'false');
+  ca.setAttribute('aria-label', all ? 'Select none' : 'Select all');
 }
+let scrollRaf=0;
+document.getElementById('list').addEventListener('scroll', ()=>{
+  if(scrollRaf) return;
+  scrollRaf=requestAnimationFrame(()=>{ scrollRaf=0; renderWindow(); });
+});
+window.addEventListener('resize', ()=>{ renderWindow(); fitCrumbs(); });
+
 function iconFor(ext){
   ext=(ext||'').toLowerCase();
   if(['mov','mp4','mxf','avi','mkv','m4v','mts','braw','r3d'].includes(ext)) return 'ti-video';
@@ -960,8 +1119,8 @@ function iconFor(ext){
 
 function updateFooter(){
   const st = document.getElementById('status');
-  const conflicts = computed.filter(c=>c.status==='conflict').length;
-  const okCount = computed.filter(c=>c.status==='ok').length;
+  let conflicts=0, okCount=0;
+  for(const c of computed){ if(c.status==='conflict') conflicts++; else if(c.status==='ok') okCount++; }
   const sel = computed.length;                       // selected AND visible
   const hidden = selected.size - sel;                // selected but hidden by the filter
   if(sel===0){ st.textContent = hidden ? hidden+' selected, hidden by the filter' : 'No selection'; }
@@ -972,7 +1131,9 @@ function updateFooter(){
       + (conflicts? '<span class="badge b-red">'+conflicts+' CONFLICT'+(conflicts>1?'S':'')+'</span>':'')
       + (hidden? '<span class="badge b-orange">'+hidden+' HIDDEN</span>':'');
   document.getElementById('btn-rename').disabled = okCount===0;
-  document.getElementById('btn-undo').disabled = !lastUndo;
+  const ub=document.getElementById('btn-undo');
+  ub.disabled = !lastUndo;
+  ub.title = lastUndo ? 'Undo the last rename in '+api.basename(lastUndo.dir) : 'Nothing to undo';
 }
 
 // ---- tree ----
@@ -985,13 +1146,14 @@ async function loadVolumes(){
   renderTree();
   if(!treeRoots.length){
     document.getElementById('tree').innerHTML =
-      '<div style="color:var(--faint);font-family:var(--sans);font-size:12px;padding:8px 6px;line-height:1.5">No disks found.<br>Try Refresh.</div>';
+      '<div style="color:var(--text4);font-family:var(--font);font-size:12px;padding:8px 6px;line-height:1.5">No disks found.<br>Try Refresh.</div>';
   }
 }
 async function ensureChildren(node){
   if(node.children===null){
-    const res = await api.readDir(node.path);
-    node.children = res.ok ? res.entries.filter(e=>e.isDir).map(e=>({name:e.name, path:e.path, isDir:true, children:null, expanded:false})) : [];
+    let res = null;
+    try { res = await api.readDir(node.path, {dirsOnly:true}); } catch(e){ res = null; }
+    node.children = (res && res.ok) ? res.entries.filter(e=>e.isDir).map(e=>({name:e.name, path:e.path, isDir:true, children:null, expanded:false})) : [];
     node.children.forEach(c=>nodeIndex.set(c.path,c));
   }
 }
@@ -1022,7 +1184,7 @@ async function revealInTree(target){
     if(!child) break;
     node=child; await ensureChildren(node); node.expanded=true;
   }
-  renderTree();
+  if(target===currentDir) renderTree();
 }
 function renderTree(){
   document.getElementById('tree').innerHTML = treeRoots.map(n=>renderNode(n)).join('');
@@ -1031,9 +1193,9 @@ function renderNode(node){
   const sel = node.path===currentDir ? ' sel':'';
   const ico = node.isVol ? volIcon(node.type) : (node.expanded?'ti-folder-open':'ti-folder');
   const chev = node.expanded ? 'ti-chevron-down' : 'ti-chevron-right';
-  let h = '<div class="tnode'+sel+'" data-tpath="'+esc(node.path)+'">'
+  let h = '<div class="tnode'+sel+'" data-tpath="'+esc(node.path)+'" title="'+esc(node.name)+'">'
         + '<span class="chev" data-tog="'+esc(node.path)+'"><i class="ti '+chev+'"></i></span>'
-        + '<i class="ti '+ico+' ico"></i>'+esc(node.name)+'</div>';
+        + '<i class="ti '+ico+' ico"></i><span class="tname">'+esc(node.name)+'</span></div>';
   if(node.expanded && node.children && node.children.length)
     h += '<div class="tchildren">'+node.children.map(c=>renderNode(c)).join('')+'</div>';
   return h;
@@ -1043,37 +1205,56 @@ function volIcon(t){ if(t==='system')return 'ti-device-imac'; if(t==='home')retu
 // ---- navigation ----
 // Sort the folder listing. Folders always stay on top, whatever the key.
 function sortEntries(list){
-  const cmpName = (a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'});
+  const cmpName = (a,b) => collator.compare(a.name, b.name);
   list.sort((a,b)=>{
     if(a.isDir!==b.isDir) return a.isDir ? -1 : 1;
     let r=0;
     if(sortKey==='created') r=(a.birthtimeMs||0)-(b.birthtimeMs||0);
     else if(sortKey==='modified') r=(a.mtimeMs||0)-(b.mtimeMs||0);
     else if(sortKey==='size') r=(a.size||0)-(b.size||0);
-    else if(sortKey==='ext') r=(a.ext||'').toLowerCase().localeCompare((b.ext||'').toLowerCase());
+    else if(sortKey==='ext') r=collator.compare(a.ext||'', b.ext||'');
     else r=cmpName(a,b);
-    if(r===0) r=cmpName(a,b);
+    if(r===0 && sortKey!=='name') r=cmpName(a,b);
     return r*sortDir;
   });
   return list;
 }
 // Rebuild the visible list from allEntries. The filter only hides rows; a hidden
-// row keeps its checkbox state but is never renamed.
-function applyView(){
-  const sorted = sortEntries(allEntries.slice());
+// row keeps its checkbox state but is never renamed. The sort runs again only
+// when the folder or the sort order changed, never on a filter keystroke.
+function applyView(resort){
+  const focusPath = focusIndex>=0 && entries[focusIndex] ? entries[focusIndex].path : null;
+  if(resort || !sortedCache) sortedCache = sortEntries(allEntries.slice());
   const q = filterText.trim().toLowerCase();
-  entries = q ? sorted.filter(e => e.name.toLowerCase().includes(q)) : sorted;
-  if(focusIndex > entries.length-1) focusIndex = entries.length ? entries.length-1 : -1;
-  anchorIndex = -1;
+  entries = q ? sortedCache.filter(e => e._n.includes(q)) : sortedCache;
+  const idx = p => p ? entries.findIndex(e=>e.path===p) : -1;
+  focusIndex = idx(focusPath);
+  if(focusIndex<0 && entries.length) focusIndex = Math.min(Math.max(0, focusIndex), entries.length-1);
+  anchorIndex = idx(anchorPath);
+  if(anchorIndex<0){ anchorPath=null; rangeBase=null; }
 }
-async function openDir(p){
-  const res = await api.readDir(p);
-  if(!res.ok){ toast('Cannot open folder'); return; }
-  currentDir = p; allEntries = res.entries; selected = new Set();
-  focusIndex = -1; applyView();
+// opts.select: paths to tick once the folder is read.
+async function openDir(p, opts){
+  const tok = ++openToken;
+  let res;
+  try { res = await api.readDir(p); } catch(e){ res = {ok:false, error:String(e)}; }
+  if(tok!==openToken) return;                       // another folder was asked for meanwhile
+  if(!res || !res.ok){ toast('Cannot open this folder'+(res && res.error ? ': '+res.error : '')); return; }
+  const changed = p!==currentDir;
+  currentDir = p;
+  allEntries = res.entries;
+  for(const e of allEntries){ e._k = looseName(e.name); e._n = e.name.toLowerCase(); }
+  const want = opts && opts.select ? new Set(opts.select.map(x=>String(x).normalize('NFC'))) : null;
+  selected = new Set(want ? allEntries.filter(e=>want.has(e.path.normalize('NFC'))).map(e=>e.path) : []);
+  focusIndex = -1; anchorIndex = -1; anchorPath = null; rangeBase = null;
+  applyView(true);
   focusIndex = entries.length ? 0 : -1;
-  renderCrumbs(); await revealInTree(p); recompute();
-  checkLeftovers(p);
+  if(changed) document.getElementById('list').scrollTop = 0;
+  renderCrumbs();
+  recompute();
+  showLeftovers(res.leftovers || []);
+  renderTree();
+  revealInTree(p);
 }
 function renderCrumbs(){
   const c = document.getElementById('crumbs');
@@ -1090,39 +1271,77 @@ function renderCrumbs(){
     html += '<span class="cr'+(last?' last':'')+'" data-cd="'+esc(full)+'">'+esc(label||full)+'</span>';
   });
   c.innerHTML = html;
+  c.title = currentDir;
+  fitCrumbs();
+}
+// A deep path keeps the current folder in view: the start is what gets cut.
+function fitCrumbs(){
+  const c = document.getElementById('crumbs');
+  c.scrollLeft = c.scrollWidth;
+  c.classList.toggle('ovf', c.scrollWidth > c.clientWidth + 1);
 }
 
+// ---- selection ----
+function setAnchor(i){ anchorIndex = i; anchorPath = (i>=0 && entries[i]) ? entries[i].path : null; rangeBase = null; }
 function toggleSelect(path){ if(selected.has(path)) selected.delete(path); else selected.add(path); recompute(); }
-// Shift-click: select every row between the anchor and the clicked row.
+// Shift-click / shift-arrows: tick every row between the anchor and row i.
+// The range replaces the previous range, so going back shrinks it.
 function selectRange(i){
-  if(anchorIndex < 0){ anchorIndex = i; toggleSelect(entries[i].path); return; }
+  if(anchorIndex < 0){
+    // No anchor yet (a new folder, or the anchor was filtered out): the
+    // focused row, else this one, becomes the anchor. Always adds, never untick.
+    setAnchor(focusIndex>=0 && focusIndex!==i ? focusIndex : i);
+  }
+  if(!rangeBase) rangeBase = new Set(selected);
+  const next = new Set(rangeBase);
   const a=Math.min(anchorIndex,i), b=Math.max(anchorIndex,i);
-  for(let k=a;k<=b;k++) selected.add(entries[k].path);
+  for(let k=a;k<=b;k++) next.add(entries[k].path);
+  selected = next;
   recompute();
 }
-
+// Move the keyboard focus: only the rows on screen are redrawn.
 function setFocus(i){
-  focusIndex = i; renderList();
-  const el = document.querySelector('#list .row.focus');
-  if(el) el.scrollIntoView({block:'nearest'});
+  focusIndex = i;
+  const list=document.getElementById('list');
+  const top=i*ROW_STEP;
+  if(top < list.scrollTop) list.scrollTop = top;
+  else if(top+ROW_STEP > list.scrollTop+list.clientHeight) list.scrollTop = top+ROW_STEP-list.clientHeight;
+  renderWindow();
 }
 
 // ---- rename ----
+function busy(on){ document.getElementById('btn-rename').disabled = on || !computed.some(c=>c.status==='ok'); }
+async function callEngine(fn, arg){
+  try { return await fn(arg); }
+  catch(e){ return { ok:false, error:String(e && e.message || e), done:[], failed:[], undo:[], halted:true }; }
+}
 async function doRename(){
+  flushRecompute();
   const pairs = computed.filter(c=>c.status==='ok').map(c=>({from:c.entry.path, to:api.join(currentDir, c.newName)}));
   if(pairs.length===0) return;
-  document.getElementById('btn-rename').disabled = true;
-  const res = await api.renameBatch(pairs);
-  lastUndo = (res.undo && res.undo.length) ? res.undo : null;
-  await openDir(currentDir);
-  selected = new Set(res.done.map(d=>d.to)); recompute();
+  const dir = currentDir;
+  busy(true);
+  const res = await callEngine(api.renameBatch, pairs);
+  res.done = res.done || []; res.failed = res.failed || []; res.undo = res.undo || [];
+  if(res.undo.length) lastUndo = { dir, pairs: res.undo };
+  // Stay ticked: the renamed files, and the ones that could not be renamed
+  // (so the batch can be tried again). Nothing known: the same selection.
+  const keep = (res.done.length || res.failed.length)
+    ? res.done.map(d=>d.to).concat(res.failed.map(f=>f.now).filter(Boolean))
+    : pairs.map(p=>p.from);
+  await openDir(dir, { select: keep });
   reportBatch(res, 'renamed');
 }
 async function doUndo(){
   if(!lastUndo) return;
-  const res = await api.renameBatch(lastUndo);
-  lastUndo = null; await openDir(currentDir);
-  selected = new Set(res.done.map(d=>d.to)); recompute();
+  flushRecompute();
+  const { dir, pairs } = lastUndo;
+  lastUndo = null;
+  // The engine reads the folder again and checks every name before touching
+  // anything: a file recreated since the rename is never overwritten.
+  const res = await callEngine(api.renameBatch, pairs);
+  res.done = res.done || []; res.failed = res.failed || [];
+  await openDir(dir, { select: res.done.map(d=>d.to) });
   reportBatch(res, 'restored');
 }
 
@@ -1131,23 +1350,33 @@ async function doUndo(){
 // where it is right now. Nothing is ever left unaccounted for.
 function reportBatch(res, verb){
   const okN = res.done.length, failed = res.failed || [];
+  if(res.error && !failed.length){
+    showReport('renamo could not finish', okN+' file'+(okN===1?' was':'s were')+' '+verb+'. Then: '+res.error+'. Check the folder before going on.', []);
+    return;
+  }
   if(!failed.length){ toast(okN+' '+verb); return; }
   const base = p => p ? api.basename(p) : null;
   const rows = failed.map(f => ({
-    name: base(f.from)+'  \u2192  '+base(f.to),
+    name: (base(f.from)||'?')+'  →  '+(base(f.to)||'?'),
     why: f.error,
-    now: f.now ? (f.now===f.from ? 'still under its original name' : 'now named '+base(f.now)) : 'could not be found - check the folder on the server',
+    now: !f.now ? 'could not be found - check the folder on the server'
+       : f.now===f.from ? 'still under its original name'
+       : f.now===f.to ? 'under its new name'
+       : 'now named '+base(f.now),
     lost: !f.now,
   }));
   const title = res.halted ? 'renamo stopped the batch' : failed.length+' file'+(failed.length>1?'s were':' was')+' not '+verb;
   const sub = res.halted
-    ? 'A file could not be found under its new name right after being renamed, so renamo touched nothing else. '+okN+' file'+(okN===1?' was':'s were')+' '+verb+' before that.'
+    ? 'A file did not check out right after being renamed (missing, or its size changed), so renamo touched nothing else. '+okN+' file'+(okN===1?' was':'s were')+' '+verb+' before that.'
     : okN+' file'+(okN===1?' was':'s were')+' '+verb+'. The others were left untouched:';
   showReport(title, sub, rows);
 }
+// A report closes with its buttons only: it sums up an operation or asks for
+// a decision, so a stray key or click must not dismiss it (charter).
 function showReport(title, sub, rows, actions){
   const old=document.getElementById('report-ov'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='report-ov'; ov.className='rep-ov';
+  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
   const card=document.createElement('div'); card.className='upd-card wide';
   const h=document.createElement('div'); h.className='upd-h'; h.textContent=title;
   const p=document.createElement('div'); p.className='upd-sub'; p.textContent=sub;
@@ -1158,75 +1387,98 @@ function showReport(title, sub, rows, actions){
       const n=document.createElement('div'); n.className='rn'; n.textContent=r.name;
       const w=document.createElement('div'); w.className='rw';
       const b=document.createElement('b'); b.textContent=r.now; w.appendChild(b);
-      if(r.why){ w.appendChild(document.createTextNode(' \u00b7 '+r.why)); }
+      if(r.why){ w.appendChild(document.createTextNode(' · '+r.why)); }
       row.appendChild(n); row.appendChild(w); list.appendChild(row); });
     card.appendChild(list);
   }
   const act=document.createElement('div'); act.className='upd-actions';
-  (actions||[{label:'OK'}]).forEach(a=>{ const btn=document.createElement('button');
+  let primary=null;
+  (actions||[{label:'Close'}]).forEach(a=>{ const btn=document.createElement('button');
     btn.className='upd-btn'+(a.go?' upd-go':''); btn.textContent=a.label;
-    btn.onclick=()=>{ close(); if(a.run) a.run(); }; act.appendChild(btn); });
+    btn.onclick=()=>{ ov.remove(); if(a.run) a.run(); }; act.appendChild(btn); primary=a.go||!primary?btn:primary; });
   card.appendChild(act); ov.appendChild(card); document.body.appendChild(ov);
-  const onKey=(e)=>{ if(e.key==='Escape'){ e.preventDefault(); close(); } };
-  function close(){ document.removeEventListener('keydown', onKey, true); ov.remove(); }
-  document.addEventListener('keydown', onKey, true);
+  if(primary) primary.focus();
 }
 
 // ---- leftovers of an interrupted rename ----
-// Looks in the folder for files a batch left under a temporary name,
-// including the hidden ones written by renamo up to 1.6.2.
-let leftovers = [];
-async function checkLeftovers(dir){
+// Files a batch left under a temporary name, including the hidden ones
+// written by renamo up to 1.6.2. They come with the folder listing.
+function showLeftovers(list){
   const box=document.getElementById('leftovers');
-  try { leftovers = (api.scanLeftovers ? await api.scanLeftovers(dir) : []) || []; } catch(e){ leftovers = []; }
-  if(dir!==currentDir) return;
-  if(!leftovers.length){ box.style.display='none'; return; }
-  const legacy = leftovers.filter(l=>l.kind==='legacy').length;
+  if(!list.length){ box.style.display='none'; return; }
+  const legacy = list.filter(l=>l.kind==='legacy').length;
   document.getElementById('lo-text').textContent =
-    leftovers.length+' file'+(leftovers.length>1?'s':'')+' left here by an interrupted rename'
+    list.length+' file'+(list.length>1?'s':'')+' left here by an interrupted rename'
     + (legacy ? ' ('+legacy+' hidden by an older renamo)' : '') + '.';
   box.style.display='flex';
 }
 async function recoverHere(){
   if(!currentDir) return;
-  const res = await api.recoverLeftovers(currentDir);
-  await openDir(currentDir);
+  const dir=currentDir;
+  let res;
+  try { res = await api.recoverLeftovers(dir); } catch(e){ res = { restored:[], failed:[], error:String(e && e.message || e) }; }
+  res.restored = res.restored || []; res.failed = res.failed || [];
+  await openDir(dir);
+  if(res.error && !res.restored.length && !res.failed.length){
+    showReport('Nothing was brought back', 'renamo could not read the folder: '+res.error+'. Nothing was changed.', []);
+    return;
+  }
   const base = p => api.basename(p);
   const rows = res.restored.map(r=>({ name: base(r.to), now: 'back in view', why: 'was '+base(r.from) }))
     .concat(res.failed.map(f=>({ name: base(f.from), now: 'left as it is', why: f.error, lost:false })));
   const legacyNote = res.restored.some(r=>/^RECOVERED_/.test(base(r.to)))
     ? ' Files hidden by renamo up to 1.6.2 had lost their name: they are numbered in the order of the batch, with the extension read from their content.'
     : '';
-  showReport(res.restored.length+' file'+(res.restored.length===1?'':'s')+' brought back', 'Nothing was deleted or overwritten.'+legacyNote, rows);
+  const takenNote = res.restored.some(r=>/_RECOVERED(_\d+)?(\.[^.]*)?$/.test(base(r.to)))
+    ? ' A file whose name had been taken since came back as <name>_RECOVERED.'
+    : '';
+  showReport(res.restored.length+' file'+(res.restored.length===1?'':'s')+' brought back', 'Nothing was deleted or overwritten.'+legacyNote+takenNote, rows);
 }
 
 let toastT=null;
-function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
 
-// ---- events ----
+// ---- controls ----
+function setOn(el, on){
+  el.classList.toggle('on', on);
+  el.setAttribute('aria-checked', on ? 'true' : 'false');
+  const inner = el.querySelector('.cbox'); if(inner) inner.classList.toggle('on', on);
+}
+function setRule(key, on){
+  const sw=document.querySelector('.sw[data-sw="'+key+'"]');
+  setOn(sw, on);
+  document.getElementById('card-'+key).classList.toggle('on', on);
+}
 function autoActivate(card){
   if(!card) return;
   const sw=card.querySelector('.sw');
-  if(sw && !sw.classList.contains('on')){ sw.classList.add('on'); card.classList.add('on'); }
+  if(sw && !sw.classList.contains('on')) setRule(sw.dataset.sw, true);
 }
-document.getElementById('modules').addEventListener('input', e=>{ autoActivate(e.target.closest('.mcard')); recompute(); });
+document.getElementById('modules').addEventListener('input', e=>{ autoActivate(e.target.closest('.mcard')); scheduleRecompute(); });
 document.getElementById('modules').addEventListener('change', e=>{ autoActivate(e.target.closest('.mcard')); syncExtMode(); recompute(); });
 document.querySelectorAll('.sw').forEach(sw=>{
-  sw.addEventListener('click', ()=>{
-    sw.classList.toggle('on');
-    document.getElementById('card-'+sw.dataset.sw).classList.toggle('on', sw.classList.contains('on'));
-    recompute();
-  });
+  sw.addEventListener('click', ()=>{ setRule(sw.dataset.sw, !sw.classList.contains('on')); recompute(); });
 });
+// Two-way choices: click, or the arrow keys once one of them has the focus.
+function pickSeg(group, btn){
+  group.querySelectorAll('button').forEach(x=>{ const on=x===btn; x.classList.toggle('active', on); x.setAttribute('aria-checked', on?'true':'false'); });
+  autoActivate(group.closest('.mcard'));
+  recompute();
+}
 ['dt-pos','nb-pos','ins-dir'].forEach(id=>{
-  document.getElementById(id).addEventListener('click', e=>{
-    const sp=e.target.closest('span'); if(!sp) return;
-    document.querySelectorAll('#'+id+' span').forEach(x=>x.classList.remove('active'));
-    sp.classList.add('active'); recompute();
+  const g=document.getElementById(id);
+  g.addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) pickSeg(g, b); });
+  g.addEventListener('keydown', e=>{
+    if(e.key!=='ArrowLeft' && e.key!=='ArrowRight') return;
+    e.preventDefault(); e.stopPropagation();
+    const bs=[...g.querySelectorAll('button')]; const k=bs.indexOf(document.activeElement);
+    const nb=bs[(k+(e.key==='ArrowRight'?1:bs.length-1))%bs.length]; nb.focus(); pickSeg(g, nb);
   });
 });
-document.getElementById('rp-case').addEventListener('click', e=>{ e.target.classList.toggle('on'); autoActivate(document.getElementById('card-replace')); recompute(); });
-document.getElementById('rx-icase').addEventListener('click', e=>{ e.target.classList.toggle('on'); autoActivate(document.getElementById('card-regex')); recompute(); });
+['rp-case','rx-icase'].forEach(id=>{
+  const b=document.getElementById(id);
+  b.addEventListener('click', ()=>{ setOn(b, !b.classList.contains('on')); autoActivate(b.closest('.mcard')); recompute(); });
+});
 document.querySelectorAll('.stepbtn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const el=document.getElementById(btn.dataset.target);
@@ -1250,36 +1502,45 @@ document.getElementById('tree').addEventListener('click', e=>{
 document.getElementById('crumbs').addEventListener('click', e=>{
   const cr=e.target.closest('.cr'); if(cr && !cr.classList.contains('last')) openDir(cr.dataset.cd);
 });
-document.getElementById('btn-up').addEventListener('click', ()=>{
+function goUp(){
   if(!currentDir) return;
   const par = api.dirname(currentDir);
   if(par && par!==currentDir) openDir(par);
-});
+}
+document.getElementById('btn-up').addEventListener('click', goUp);
 
-let clickTimer=null;
+// A single click on a folder ticks it after a short delay, so that a double
+// click can open it instead. The pending click belongs to one row: clicking
+// another row carries it out at once rather than dropping it.
+let pendingClick=null;   // { path, timer, run }
+function flushPendingClick(){ if(pendingClick){ clearTimeout(pendingClick.timer); const r=pendingClick.run; pendingClick=null; r(); } }
 document.getElementById('list').addEventListener('click', e=>{
   const row=e.target.closest('.row'); if(!row) return;
   const path=row.dataset.path; const isDir=row.dataset.dir==='1';
   const i = parseInt(row.dataset.i,10);
-  focusIndex = i;
   if(e.shiftKey){                       // range select, no open-folder delay
-    if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
+    flushPendingClick();
     window.getSelection && window.getSelection().removeAllRanges();
-    selectRange(i); return;
+    selectRange(i); focusIndex=i; renderWindow(); return;
   }
-  if(e.target.closest('.cbox')){ anchorIndex=i; toggleSelect(path); return; }
+  focusIndex = i;
+  if(e.target.closest('.cbox')){ flushPendingClick(); setAnchor(i); toggleSelect(path); return; }
   if(isDir){
-    if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; return; }
-    clickTimer=setTimeout(()=>{ clickTimer=null; anchorIndex=i; toggleSelect(path); },220);
-  } else { anchorIndex=i; toggleSelect(path); }
+    if(pendingClick && pendingClick.path===path){ clearTimeout(pendingClick.timer); pendingClick=null; return; }   // second click of a double click
+    flushPendingClick();
+    const run=()=>{ const k=entries.findIndex(x=>x.path===path); if(k<0) return; setAnchor(k); toggleSelect(path); };
+    pendingClick={ path, run, timer:setTimeout(()=>{ pendingClick=null; run(); },220) };
+  } else { flushPendingClick(); setAnchor(i); toggleSelect(path); }
 });
 document.getElementById('list').addEventListener('dblclick', e=>{
   const row=e.target.closest('.row'); if(!row) return;
-  if(row.dataset.dir==='1'){ if(clickTimer){clearTimeout(clickTimer);clickTimer=null;} openDir(row.dataset.path); }
+  if(row.dataset.dir==='1'){ if(pendingClick && pendingClick.path===row.dataset.path){ clearTimeout(pendingClick.timer); pendingClick=null; } openDir(row.dataset.path); }
 });
 document.getElementById('chk-all').addEventListener('click', ()=>{
   const all = entries.length>0 && entries.every(e=>selected.has(e.path));
-  selected = all ? new Set() : new Set(entries.map(e=>e.path));
+  if(all) entries.forEach(e=>selected.delete(e.path));
+  else entries.forEach(e=>selected.add(e.path));
+  rangeBase=null;
   recompute();
 });
 // ---- sort ----
@@ -1290,23 +1551,28 @@ function refreshSortUI(){
   b.setAttribute('aria-label', sortDir>0 ? 'Sort ascending' : 'Sort descending');
 }
 document.getElementById('sort-key').addEventListener('change', e=>{
-  sortKey = e.target.value; applyView(); recompute();
+  sortKey = e.target.value; applyView(true); recompute();
 });
 document.getElementById('sort-dir').addEventListener('click', ()=>{
-  sortDir = -sortDir; refreshSortUI(); applyView(); recompute();
+  sortDir = -sortDir; refreshSortUI(); applyView(true); recompute();
 });
 // ---- filter ----
 const fltEl = document.getElementById('flt');
+let filterT=null;
 function refreshFilterUI(){
   document.getElementById('filterwrap').classList.toggle('on', filterText.trim()!=='');
 }
-fltEl.addEventListener('input', ()=>{ filterText = fltEl.value; refreshFilterUI(); applyView(); recompute(); });
+function setFilter(v, now){
+  filterText = v; refreshFilterUI();
+  clearTimeout(filterT);
+  const run=()=>{ filterT=null; applyView(false); recompute(); };
+  if(now) run(); else filterT=setTimeout(run, 80);
+}
+fltEl.addEventListener('input', ()=>setFilter(fltEl.value, false));
 fltEl.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ fltEl.value=''; filterText=''; refreshFilterUI(); applyView(); recompute(); fltEl.blur(); }
+  if(e.key==='Escape'){ fltEl.value=''; setFilter('', true); fltEl.blur(); }
 });
-document.getElementById('flt-clear').addEventListener('click', ()=>{
-  fltEl.value=''; filterText=''; refreshFilterUI(); applyView(); recompute();
-});
+document.getElementById('flt-clear').addEventListener('click', ()=>{ fltEl.value=''; setFilter('', true); });
 
 // ---- drag & drop from Finder / Explorer ----
 let dragDepth=0;
@@ -1319,23 +1585,29 @@ window.addEventListener('drop', async e=>{
   if(!files.length) return;
   const paths = files.map(f => { try { return api.getPathForFile(f); } catch(err){ return f.path || ''; } }).filter(Boolean);
   if(!paths.length){ toast('Could not read the dropped item'); return; }
-  const info = await api.statPaths(paths);
-  const dirs = info.filter(x=>x.isDir), items = info.filter(x=>x.exists);
-  // A single folder: open it. Anything else: open the parent folder and tick the dropped items.
+  let info = [];
+  try { info = await api.statPaths(paths); } catch(err){ info = []; }
+  const items = info.filter(x=>x.exists);
+  const dirs = items.filter(x=>x.isDir);
+  // A single folder: open it. Anything else: open the folder of the first
+  // item and tick what was dropped from that folder. renamo works on one
+  // folder at a time, and says what it left aside.
   if(dirs.length===1 && items.length===1){ await openDir(dirs[0].path); return; }
   if(!items.length){ toast('Could not read the dropped item'); return; }
   const parent = api.dirname(items[0].path);
-  await openDir(parent);
-  const want = new Set(items.map(x=>x.path));
-  selected = new Set(entries.filter(en=>want.has(en.path)).map(en=>en.path));
-  recompute();
-  toast(selected.size+' item'+(selected.size>1?'s':'')+' selected');
+  const here = items.filter(x=>api.dirname(x.path)===parent);
+  const ignored = items.length - here.length;
+  await openDir(parent, { select: here.map(x=>x.path) });
+  toast(selected.size+' item'+(selected.size>1?'s':'')+' selected'
+    + (ignored ? ' · '+ignored+' from other folders left aside (one folder at a time)' : ''));
 });
 
 document.getElementById('btn-rename').addEventListener('click', doRename);
 document.getElementById('lo-recover').addEventListener('click', recoverHere);
 document.getElementById('btn-undo').addEventListener('click', doUndo);
-document.getElementById('btn-refresh').addEventListener('click', ()=>{ if(currentDir) openDir(currentDir); else loadVolumes(); });
+document.getElementById('btn-refresh').addEventListener('click', ()=>{
+  if(currentDir) openDir(currentDir, { select: [...selected] }); else loadVolumes();
+});
 document.getElementById('disks-refresh').addEventListener('click', async ()=>{
   const b=document.getElementById('disks-refresh'); b.classList.add('spin');
   try{ await loadVolumes(); if(currentDir) await revealInTree(currentDir); }
@@ -1348,31 +1620,32 @@ document.getElementById('wc-max').addEventListener('click', ()=>{ try{ api.winMa
 document.getElementById('wc-close').addEventListener('click', ()=>{ try{ api.winClose && api.winClose(); }catch(e){} });
 
 // ---- keyboard navigation ----
+// The list keys work when the list (or nothing in particular) has the focus.
+// A focused button keeps Space and Enter for itself, and an open window
+// keeps the keyboard away from the list behind it.
+function modalOpen(){ return !!document.querySelector('#report-ov,#update-ov,#about-ov'); }
 document.addEventListener('keydown', e=>{
+  if(modalOpen()) return;
   const mod = e.metaKey || e.ctrlKey;
   if(mod && (e.key==='f'||e.key==='F')){ e.preventDefault(); fltEl.focus(); fltEl.select(); return; }
-  const tag=(document.activeElement && document.activeElement.tagName||'').toLowerCase();
-  if(tag==='input'||tag==='select'||tag==='textarea') return;
+  const ae=document.activeElement;
+  const inList = !ae || ae===document.body || document.getElementById('list').contains(ae);
+  if(!inList) return;
   if(!entries.length) return;
   if(mod && (e.key==='a'||e.key==='A')){
     e.preventDefault();
-    selected = new Set(entries.map(en=>en.path)); anchorIndex=0; recompute(); return;
+    entries.forEach(en=>selected.add(en.path)); setAnchor(0); recompute(); return;
   }
-  if(e.key==='ArrowDown'){
+  if(e.key==='ArrowDown' || e.key==='ArrowUp'){
     e.preventDefault();
-    const ni=Math.min(entries.length-1, focusIndex<0?0:focusIndex+1);
-    if(e.shiftKey){ if(anchorIndex<0) anchorIndex=focusIndex<0?0:focusIndex; focusIndex=ni; selectRange(ni); setFocus(ni); }
-    else { anchorIndex=ni; setFocus(ni); }
+    const from = focusIndex<0 ? 0 : focusIndex;
+    const ni = e.key==='ArrowDown' ? Math.min(entries.length-1, focusIndex<0?0:from+1) : Math.max(0, from-1);
+    if(e.shiftKey){ if(anchorIndex<0) setAnchor(from); focusIndex=ni; selectRange(ni); setFocus(ni); }
+    else { setAnchor(ni); setFocus(ni); }
   }
-  else if(e.key==='ArrowUp'){
-    e.preventDefault();
-    const ni=Math.max(0, focusIndex<0?0:focusIndex-1);
-    if(e.shiftKey){ if(anchorIndex<0) anchorIndex=focusIndex<0?0:focusIndex; focusIndex=ni; selectRange(ni); setFocus(ni); }
-    else { anchorIndex=ni; setFocus(ni); }
-  }
-  else if(e.key===' '){ e.preventDefault(); if(focusIndex>=0){ anchorIndex=focusIndex; toggleSelect(entries[focusIndex].path); } }
+  else if(e.key===' '){ e.preventDefault(); if(focusIndex>=0){ setAnchor(focusIndex); toggleSelect(entries[focusIndex].path); } }
   else if(e.key==='Enter'){ if(focusIndex>=0 && entries[focusIndex].isDir) openDir(entries[focusIndex].path); }
-  else if(e.key==='Backspace'){ e.preventDefault(); document.getElementById('btn-up').click(); }
+  else if(e.key==='Backspace'){ e.preventDefault(); goUp(); }
 });
 
 // ---- sidebar resize ----
@@ -1385,7 +1658,7 @@ document.addEventListener('keydown', e=>{
     const w=Math.max(150, Math.min(480, e.clientX - main.getBoundingClientRect().left));
     sb.style.width=w+'px';
   });
-  window.addEventListener('mouseup', ()=>{ if(drag){ drag=false; rz.classList.remove('drag'); document.body.style.cursor=''; } });
+  window.addEventListener('mouseup', ()=>{ if(drag){ drag=false; rz.classList.remove('drag'); document.body.style.cursor=''; fitCrumbs(); } });
 })();
 
 // init
@@ -1398,6 +1671,12 @@ function detectPlatform(){
 }
 const plat = detectPlatform();
 document.body.classList.add(plat==='darwin'?'mac':(plat==='win32'?'win':'linux'));
+(function(){
+  // The folder button is named after the file manager of the system.
+  const fm = plat==='darwin' ? 'Finder' : plat==='win32' ? 'Explorer' : 'Files';
+  document.getElementById('reveal-label').textContent = fm;
+  document.getElementById('btn-reveal').title = 'Show the current folder in '+fm;
+})();
 syncExtMode();
 refreshSortUI();
 refreshFilterUI();
@@ -1405,15 +1684,20 @@ loadVolumes();
 renderList();
 updateFooter();
 
-// ── Update check notice (anti-nag via localStorage) ──
+// ── Update check (asked for at launch unless turned off in About) ──
 let appVersion='';
 const UPD_DISMISS_KEY='renamo_upd_dismissed';
+const UPD_CHECK_KEY='renamo_check_updates';
+function updatesOn(){ try{ return localStorage.getItem(UPD_CHECK_KEY)!=='off'; }catch(e){ return true; } }
+function setUpdatesOn(on){ try{ localStorage.setItem(UPD_CHECK_KEY, on?'on':'off'); }catch(e){} }
+// The notice carries a choice, so it closes with its buttons only.
 function showUpdateNotice(info){
-  const version=info&&info.version, url=(info&&info.url)||'https://www.just-edit.fr';
-  if(!version) return;
+  const version=info&&info.version, url=info&&info.url;
+  if(!version || !url) return;
   try{ if(localStorage.getItem(UPD_DISMISS_KEY)===String(version)) return; }catch(e){}
   if(document.getElementById('update-ov')) return;
   const ov=document.createElement('div'); ov.id='update-ov';
+  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
   const card=document.createElement('div'); card.className='upd-card';
   const h=document.createElement('div'); h.className='upd-h'; h.textContent='New version available';
   const sub=document.createElement('div'); sub.className='upd-sub';
@@ -1427,7 +1711,7 @@ function showUpdateNotice(info){
   const dismiss=()=>{ try{ localStorage.setItem(UPD_DISMISS_KEY,String(version)); }catch(e){} ov.remove(); };
   later.onclick=dismiss;
   go.onclick=()=>{ try{ api.openExternal(url); }catch(e){} dismiss(); };
-  ov.onclick=(e)=>{ if(e.target===ov) dismiss(); };
+  go.focus();
 }
 // ── About / GPL notice ──
 const REPO_URL='https://github.com/noar-justedit/renamo';
@@ -1435,13 +1719,21 @@ const LICENSE_URL='https://github.com/noar-justedit/renamo/blob/main/LICENSE';
 function showAbout(){
   if(document.getElementById('about-ov')) return;
   const ov=document.createElement('div'); ov.id='about-ov';
+  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
   const card=document.createElement('div'); card.className='upd-card';
   const h=document.createElement('div'); h.className='upd-h'; h.textContent='renamo';
   const sub=document.createElement('div'); sub.className='upd-sub';
   const l1=document.createElement('div'); l1.textContent='Version '+(appVersion||'');
   const l2=document.createElement('div'); l2.style.marginTop='6px'; l2.textContent='Free software under the GNU General Public License v3.0 or later.';
-  const l3=document.createElement('div'); l3.style.marginTop='6px'; l3.textContent='\u00A9 2026 just edit';
+  const l3=document.createElement('div'); l3.style.marginTop='6px'; l3.textContent='© 2026 just edit';
   sub.appendChild(l1); sub.appendChild(l2); sub.appendChild(l3);
+  // The only thing renamo sends over the network: a request for its own
+  // version.json at launch. It can be turned off here.
+  const set=document.createElement('button'); set.type='button'; set.className='set-row chk-inline'; set.setAttribute('role','checkbox');
+  const box=document.createElement('span'); box.className='cbox'; set.appendChild(box);
+  set.appendChild(document.createTextNode('Check for a new version at launch'));
+  setOn(set, updatesOn());
+  set.onclick=()=>{ const on=!set.classList.contains('on'); setOn(set, on); setUpdatesOn(on); };
   const links=document.createElement('div'); links.className='upd-links';
   const src=document.createElement('a'); src.textContent='View source'; src.onclick=()=>{ try{ api.openExternal(REPO_URL); }catch(e){} };
   const lic=document.createElement('a'); lic.textContent='License'; lic.onclick=()=>{ try{ api.openExternal(LICENSE_URL); }catch(e){} };
@@ -1449,7 +1741,7 @@ function showAbout(){
   const actions=document.createElement('div'); actions.className='upd-actions';
   const close=document.createElement('button'); close.className='upd-btn'; close.textContent='Close';
   actions.appendChild(close);
-  card.appendChild(h); card.appendChild(sub); card.appendChild(links); card.appendChild(actions);
+  card.appendChild(h); card.appendChild(sub); card.appendChild(set); card.appendChild(links); card.appendChild(actions);
   ov.appendChild(card); document.body.appendChild(ov);
   // This window only informs, so Escape closes it (charter). The update notice
   // carries a choice and keeps its buttons.
@@ -1458,6 +1750,7 @@ function showAbout(){
   document.addEventListener('keydown', onKey, true);
   close.onclick=dismiss;
   ov.onclick=(e)=>{ if(e.target===ov) dismiss(); };
+  close.focus();
 }
 (async()=>{
   // A batch that never finished (crash, power cut): say so and lead to the folder.
@@ -1471,10 +1764,14 @@ function showAbout(){
     }
   }catch(e){}
   try{ appVersion=await api.getVersion(); }catch(e){}
-  try{ api.onUpdateAvailable(showUpdateNotice); }catch(e){}
   const fmv=document.getElementById('fm-ver'); if(fmv&&appVersion) fmv.textContent='v'+appVersion;
-  const lg=document.getElementById('lnk-github'); if(lg) lg.onclick=()=>{ try{ api.openExternal(REPO_URL); }catch(e){} };
-  const la=document.getElementById('lnk-about'); if(la) la.onclick=showAbout;
+  document.getElementById('lnk-github').onclick=()=>{ try{ api.openExternal(REPO_URL); }catch(e){} };
+  document.getElementById('lnk-about').onclick=showAbout;
+  if(updatesOn() && api.checkUpdate){
+    setTimeout(async()=>{
+      try{ const info = await api.checkUpdate(); if(info && !modalOpen()) showUpdateNotice(info); }catch(e){}
+    }, 1500);
+  }
 })();
 </script>
 </body>

@@ -3,7 +3,11 @@
 <!--
   Hardened runtime entitlements for the Developer ID build.
 
-  These four are what Chromium/V8 needs to run under the hardened runtime.
+  What Chromium/V8 needs to run under the hardened runtime, and nothing more:
+  the same three keys as electron-builder's own template.
+  allow-dyld-environment-variables was dropped in 1.6.4: it let a DYLD_*
+  variable inject code into the signed app, which holds the user's
+  folder permissions.
   renamo is NOT sandboxed: it has to reach any volume the user points it at, so
   there is no com.apple.security.app-sandbox key here, and file access is governed
   by macOS TCC prompts instead (see extendInfo in package.json).
@@ -13,8 +17,6 @@
   <key>com.apple.security.cs.allow-jit</key>
   <true/>
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-  <true/>
-  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
   <true/>
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>

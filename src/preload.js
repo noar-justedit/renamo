@@ -63,7 +63,7 @@ contextBridge.exposeInMainWorld('renamo', {
   dirname,
   basename,
   listVolumes: () => ipcRenderer.invoke('list-volumes'),
-  readDir: (p) => ipcRenderer.invoke('read-dir', p),
+  readDir: (p, opts) => ipcRenderer.invoke('read-dir', p, opts),
   statPaths: (paths) => ipcRenderer.invoke('stat-paths', paths),
   getPathForFile,
   renameBatch: (pairs) => ipcRenderer.invoke('rename-batch', pairs),
@@ -76,5 +76,5 @@ contextBridge.exposeInMainWorld('renamo', {
   winClose: () => ipcRenderer.invoke('win-close'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getVersion: () => ipcRenderer.invoke('get-version'),
-  onUpdateAvailable: (cb) => { ipcRenderer.on('update-available', (_e, d) => cb(d)); },
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
 });

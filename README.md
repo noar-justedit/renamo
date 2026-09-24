@@ -18,9 +18,14 @@ macOS and Windows. Built with Electron. No dependencies, no sign-up.
 - Range selection with shift-click or shift+arrows, select all with Cmd/Ctrl+A
 - Live preview with the changed part shown in green and name-collision detection
 - Safe renaming: renamo only ever renames. It never deletes, never overwrites and never hides a file,
-  checks every rename and stops at the first anomaly, with a report of where each file is
+  renames a file only inside its own folder, checks every rename and stops at the first anomaly,
+  with a report of where each file is
+- Names that would not work are caught in the preview: an empty name, a name Windows refuses
+  (`< > : " | ? *`, a trailing dot or space, `CON`, `NUL`…), a creation date the volume does not record
+- Built for big folders on a NAS: only the rows on screen are drawn, the folder is read in parallel,
+  and 10 000 files rename in about a second
 - One-click undo of the last batch, and recovery of files left behind by an interrupted rename
-- Resizable disk browser, full keyboard navigation
+- Resizable disk browser, full keyboard navigation (every switch, choice and checkbox is reachable with Tab)
 
 ### Rule order
 
@@ -108,7 +113,7 @@ removable or network volume; the reason strings shown in those prompts live in t
 
 ## Updates
 
-On launch, renamo checks its own version.json in this repository and shows a notice if a newer version exists. Nothing else is sent. If you fork renamo, update the URL in src/main.js (UPDATE_URL) to point to your own version.json, or remove the check.
+On launch, renamo checks its own version.json in this repository and shows a notice if a newer version exists. Nothing else is sent, nothing is downloaded: the notice only opens the releases page. The check can be turned off in About. If you fork renamo, update the URL in src/main.js (UPDATE_URL) to point to your own version.json, or remove the check.
 
 ## Third-party components
 

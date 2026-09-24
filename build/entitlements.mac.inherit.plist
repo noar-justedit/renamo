@@ -2,15 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Same entitlements for the helper processes Electron spawns (renderer, GPU,
-  plugin). They are signed separately and need the identical JIT permissions.
+  plugin). They are signed separately and need the identical JIT permissions
+  (no allow-dyld-environment-variables, see entitlements.mac.plist).
 -->
 <plist version="1.0">
 <dict>
   <key>com.apple.security.cs.allow-jit</key>
   <true/>
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-  <true/>
-  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
   <true/>
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>

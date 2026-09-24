@@ -201,13 +201,200 @@ t('hidden leftovers of renamo 1.6.2 are found and brought back, with their exten
   assert.ok(names(d).every(n => !n.startsWith('.')));
 });
 
-t('recovery never overwrites an existing file either', () => {
+t('recovery never overwrites: a name taken since comes back as <name>_RECOVERED', () => {
   const d = tmpdir(); const [a] = mkfiles(d, 1);
   fs.renameSync(a, a + '.renamo-tmp'); write(d, path.basename(a), 'someone else took the name');
   const before = contents(d);
   const res = createEngine().recoverLeftovers(d);
-  assert.strictEqual(res.restored.length, 0); assert.strictEqual(res.failed.length, 1);
+  assert.strictEqual(res.failed.length, 0); assert.strictEqual(res.restored.length, 1);
+  assert.strictEqual(path.basename(res.restored[0].to), path.basename(a, '.mov') + '_RECOVERED.mov');
   assert.deepStrictEqual(contents(d), before);
+  assert.strictEqual(fs.readFileSync(a, 'utf8'), 'someone else took the name');
+});
+
+t('a suffix repeated by a later batch still goes back to the original name', () => {
+  const d = tmpdir(); const [a] = mkfiles(d, 1);
+  fs.renameSync(a, a + '.renamo-tmp.renamo-tmp-2');
+  const e = createEngine();
+  assert.strictEqual(e.findLeftovers(d)[0].original, path.basename(a));
+  e.recoverLeftovers(d);
+  assert.deepStrictEqual(names(d), [path.basename(a)]);
+});
+
+t('a file named just ".renamo-tmp" is not taken for a leftover', () => {
+  const d = tmpdir(); write(d, '.renamo-tmp', 'not ours');
+  assert.strictEqual(createEngine().findLeftovers(d).length, 0);
+});
+
+// ── case and accents (1.6.4) ───────────────────────────────────────────────
+// A volume that tells case and accents apart (Linux, many NAS shares,
+// case-sensitive APFS), simulated in memory so these checks run the same on
+// the Mac that builds renamo, whose own disk does not tell them apart.
+function strictMemFs(files) {
+  const store = new Map();                        // full path -> { data, ino }
+  let ino = 100;
+  for (const [p, data] of Object.entries(files)) store.set(p, { data, ino: ino++ });
+  const err = (code, p) => { const e = new Error(code + ': ' + p); e.code = code; return e; };
+  const stat = f => ({ ino: f.ino, dev: 1, size: f.data.length, mtimeMs: 1, birthtimeMs: 1, mode: 0o100644, isDirectory: () => false });
+  return {
+    store,
+    lstatSync: p => { const f = store.get(p); if (!f) throw err('ENOENT', p); return stat(f); },
+    readdirSync: d => [...store.keys()].filter(p => path.dirname(p) === d).map(p => path.basename(p)),
+    renameSync: (a, b) => { const f = store.get(a); if (!f) throw err('ENOENT', a); store.delete(a); store.set(b, f); },  // POSIX: replaces b
+    mkdirSync: () => {}, writeFileSync: () => {}, readFileSync: () => { throw err('ENOENT', 'journal'); },
+  };
+}
+const D = '/vol/rushes';
+const contentsOf = m => [...m.store.values()].map(f => f.data).sort();
+
+t('on a volume that tells case apart, a.txt -> A.txt never overwrites the existing A.txt', () => {
+  const m = strictMemFs({ [D + '/a.txt']: 'draft', [D + '/A.txt']: 'MASTER' });
+  const res = createEngine({ fs: m }).renameBatch([{ from: D + '/a.txt', to: D + '/A.txt' }]);
+  assert.strictEqual(res.done.length, 0); assert.strictEqual(res.failed.length, 1);
+  assert.deepStrictEqual(contentsOf(m), ['MASTER', 'draft'], 'a file was overwritten');
+  assert.strictEqual(m.store.get(D + '/A.txt').data, 'MASTER');
+});
+
+t('a case swap between two distinct files loses nothing', () => {
+  const m = strictMemFs({ [D + '/a.txt']: 'lower', [D + '/A.txt']: 'UPPER' });
+  createEngine({ fs: m }).renameBatch([{ from: D + '/a.txt', to: D + '/A.txt' }, { from: D + '/A.txt', to: D + '/a.txt' }]);
+  assert.deepStrictEqual(contentsOf(m), ['UPPER', 'lower'], 'a file was lost');
+});
+
+t('two accent forms of one name (NFD / NFC) are two files: never overwritten', () => {
+  const m = strictMemFs({ [D + '/Café.mov']: 'nfd', [D + '/Café.mov']: 'nfc' });
+  const res = createEngine({ fs: m }).renameBatch([{ from: D + '/Café.mov', to: D + '/Café.mov' }]);
+  assert.strictEqual(res.done.length, 0);
+  assert.deepStrictEqual(contentsOf(m), ['nfc', 'nfd']);
+});
+
+t('on that volume, a plain case-only rename still goes through', () => {
+  const m = strictMemFs({ [D + '/clip.mov']: 'x' });
+  const res = createEngine({ fs: m }).renameBatch([{ from: D + '/clip.mov', to: D + '/CLIP.mov' }]);
+  assert.strictEqual(res.failed.length, 0); assert.deepStrictEqual([...m.store.keys()], [D + '/CLIP.mov']);
+});
+
+// The same check on the real disk, when the disk running the tests tells case apart.
+{
+  const probe = tmpdir(); write(probe, 'case.probe', 'x');
+  if (!fs.existsSync(path.join(probe, 'CASE.PROBE'))) {
+    t('real disk that tells case apart: a.txt -> A.txt never overwrites A.txt', () => {
+      const d = tmpdir(); const a = write(d, 'a.txt', 'draft'); write(d, 'A.txt', 'MASTER');
+      const before = contents(d);
+      const res = createEngine().renameBatch([{ from: a, to: path.join(d, 'A.txt') }]);
+      assert.strictEqual(res.done.length, 0);
+      assert.deepStrictEqual(contents(d), before);
+    });
+  }
+}
+
+t('a plain case-only rename still works when no other file has that name', () => {
+  const d = tmpdir(); const a = write(d, 'clip.mov', 'x');
+  const res = createEngine().renameBatch([{ from: a, to: path.join(d, 'CLIP.mov') }]);
+  assert.strictEqual(res.failed.length, 0); assert.deepStrictEqual(names(d), ['CLIP.mov']);
+});
+
+// A case-insensitive volume (macOS, Windows, most NAS seen from them), simulated:
+// every path is resolved to the entry whose name matches loosely.
+function caseInsensitiveFs() {
+  const w = Object.create(fs);
+  const loose = s => s.normalize('NFC').toLowerCase();
+  const real = p => {
+    const dir = path.dirname(p), b = path.basename(p);
+    const hit = fs.readdirSync(dir).find(n => loose(n) === loose(b));
+    return hit ? path.join(dir, hit) : p;
+  };
+  w.lstatSync = p => fs.lstatSync(real(p));
+  w.renameSync = (a, b) => {
+    const ra = real(a), rb = real(b);
+    if (rb !== b && rb !== ra) { fs.renameSync(ra, rb); return; }   // what the OS does: replaces
+    fs.renameSync(ra, b);
+  };
+  return w;
+}
+t('on a case-insensitive volume, a case-only rename of a file is accepted (same inode)', () => {
+  const d = tmpdir(); const a = write(d, 'clip.mov', 'x');
+  const res = createEngine({ fs: caseInsensitiveFs() }).renameBatch([{ from: a, to: path.join(d, 'Clip.MOV') }]);
+  assert.strictEqual(res.failed.length, 0, JSON.stringify(res.failed));
+  assert.deepStrictEqual(names(d), ['Clip.MOV']);
+});
+
+// ── requests that must be refused (1.6.4) ──────────────────────────────────
+t('a new name starting with a dot is refused: the file would be hidden', () => {
+  const d = tmpdir(); const [a] = mkfiles(d, 1); const before = names(d);
+  const res = createEngine().renameBatch([{ from: a, to: path.join(d, '.mov') }]);
+  assert.strictEqual(res.done.length, 0); assert.ok(/hidden/.test(res.failed[0].error));
+  assert.deepStrictEqual(names(d), before);
+});
+
+t('a file is never moved out of its folder, whatever the request says', () => {
+  const d = tmpdir(); const other = tmpdir(); const [a] = mkfiles(d, 1);
+  const res = createEngine().renameBatch([
+    { from: a, to: path.join(other, 'moved.mov') },
+    { from: a, to: d + '/sub/../../y.mov' },
+    { from: 'relative.mov', to: 'x.mov' },
+    { from: 42, to: null }, null,
+  ]);
+  assert.strictEqual(res.done.length, 0); assert.strictEqual(res.failed.length, 5);
+  assert.deepStrictEqual(fs.readdirSync(other), []);
+  assert.ok(fs.existsSync(a));
+});
+
+t('Windows rules are enforced on Windows: illegal characters, trailing dot, reserved names', () => {
+  const e = createEngine({ platform: 'win32' });
+  const d = '/tmp/x';
+  for (const bad of ['a:b.mov', 'what?.mov', 'end.', 'end ', 'CON', 'nul.txt', 'com1.mov']) {
+    assert.ok(e.checkPair({ from: d + '/a.mov', to: d + '/' + bad }), bad + ' was accepted');
+  }
+  assert.strictEqual(e.checkPair({ from: d + '/a.mov', to: d + '/console.mov' }), null);
+});
+
+// ── verification (1.6.4) ───────────────────────────────────────────────────
+t('a renamed file whose size reads back different is reported under its new name, and can be undone', () => {
+  const d = tmpdir(); const files = mkfiles(d, 3); const before = contents(d);
+  const w = Object.create(fs);
+  w.lstatSync = p => { const s = fs.lstatSync(p); if (p.endsWith('A001C001_V2.mov')) return Object.assign(Object.create(Object.getPrototypeOf(s)), s, { size: s.size + 1 }); return s; };
+  const res = createEngine({ fs: w }).renameBatch(files.map(f => ({ from: f, to: withSuffix(f, '_V2') })));
+  assert.strictEqual(res.halted, true);
+  const f = res.failed.find(x => /size/.test(x.error));
+  assert.ok(f, 'no size failure reported');
+  assert.strictEqual(f.now, withSuffix(files[0], '_V2'), 'the file is not reported where it is');
+  assert.ok(res.undo.some(u => u.from === f.now), 'the rename that happened cannot be undone');
+  assert.deepStrictEqual(contents(d), before);
+  assert.strictEqual(names(d).filter(n => /_V2/.test(n)).length, 1, 'renamo went on after the anomaly');
+});
+
+t('an I/O error while checking a rename stops the batch like a missing file', () => {
+  const d = tmpdir(); const files = mkfiles(d, 5); const before = contents(d);
+  const w = Object.create(fs); let armed = false;
+  w.renameSync = (a, b) => { fs.renameSync(a, b); armed = true; };
+  w.lstatSync = p => { if (armed && /_V2/.test(p)) { const e = new Error('EIO'); e.code = 'EIO'; throw e; } return fs.lstatSync(p); };
+  const res = createEngine({ fs: w }).renameBatch(files.map(f => ({ from: f, to: withSuffix(f, '_V2') })));
+  assert.strictEqual(res.halted, true);
+  assert.strictEqual(names(d).filter(n => /_V2/.test(n)).length, 1);
+  assert.deepStrictEqual(contents(d), before);
+});
+
+t('an unreadable file is reported, the batch is not thrown away', () => {
+  const d = tmpdir(); const files = mkfiles(d, 3);
+  const w = Object.create(fs);
+  w.lstatSync = p => { if (p === files[1]) { const e = new Error('EACCES'); e.code = 'EACCES'; throw e; } return fs.lstatSync(p); };
+  const res = createEngine({ fs: w }).renameBatch(files.map(f => ({ from: f, to: withSuffix(f, '_V2') })));
+  assert.strictEqual(res.done.length, 2); assert.strictEqual(res.failed.length, 1);
+  assert.ok(/cannot be read/.test(res.failed[0].error));
+});
+
+// ── cost (1.6.4) ───────────────────────────────────────────────────────────
+t('a big batch writes the journal a handful of times, not once per file', () => {
+  const d = tmpdir(); const j = path.join(tmpdir(), 'journal.json'); const files = mkfiles(d, 1000);
+  const w = Object.create(fs); let writes = 0, stats = 0;
+  w.writeFileSync = (...a) => { writes++; return fs.writeFileSync(...a); };
+  w.lstatSync = p => { stats++; return fs.lstatSync(p); };
+  const res = createEngine({ fs: w, journalPath: j }).renameBatch(files.map(f => ({ from: f, to: withSuffix(f, '_V2') })));
+  assert.strictEqual(res.done.length, 1000);
+  assert.ok(writes <= 12, 'journal written ' + writes + ' times');
+  assert.ok(stats <= 3 * 1000 + 10, stats + ' stats for 1000 files');
+  assert.strictEqual(JSON.parse(fs.readFileSync(j, 'utf8')).finished, true);
 });
 
 // ── journal ────────────────────────────────────────────────────────────────

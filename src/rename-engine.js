@@ -24,19 +24,27 @@
  *
  *   1. It only ever calls rename. No delete, no copy, no write, no truncate
  *      on a user path - test/safety.test.js fails if one of those appears.
- *   2. It never overwrites. Before every rename the target must be free, both
- *      by stat and by the folder listing (case and accents compared loosely,
- *      because NAS and macOS disagree on both).
- *   3. It never hides a file. A temporary name is used only when two files of
- *      the batch swap or chain their names, and it is visible and keeps the
- *      original name: "clip.mov.renamo-tmp". The plain case - adding a
- *      suffix, a prefix, a date - is a single direct rename per file.
+ *   2. It never overwrites. Right before every rename the target must be
+ *      free, both by stat and by the folder listing (case and accents
+ *      compared loosely, because NAS and macOS disagree on both). A name that
+ *      differs only by case or accents is accepted only when it is provably
+ *      the same file (same inode, and no other entry of that exact name).
+ *   3. It never hides a file. No new name may start with a dot. A temporary
+ *      name is used only when two files of the batch swap or chain their
+ *      names, and it is visible and keeps the original name:
+ *      "clip.mov.renamo-tmp". The plain case - adding a suffix, a prefix, a
+ *      date - is a single direct rename per file.
  *   4. It checks every rename and stops at the first anomaly. If a renamed
- *      file cannot be found under its new name, the batch halts before
- *      touching anything else, and says exactly where each file is.
+ *      file cannot be found under its new name, or its size changed, the
+ *      batch halts before touching anything else, and says exactly where
+ *      each file is.
  *
- * Every step is also written to a journal outside the user's folders, so an
- * interrupted batch can be put back after a crash or a power cut.
+ * Every request is validated here too - a file is only ever renamed inside
+ * its own folder - so nothing that reaches the engine can move a file
+ * elsewhere, whatever the caller sends.
+ *
+ * The batch is also written to a journal outside the user's folders, so an
+ * interrupted batch is reported after a crash or a power cut.
  */
 'use strict';
 const path = require('path');
@@ -45,45 +53,87 @@ const nodeFs = require('fs');
 const TMP_SUFFIX = '.renamo-tmp';
 // The format used up to 1.6.2: hidden, and without the original name.
 const LEGACY_TMP = /^\.renamo_tmp_(\d+)_(\d+)_(\d+)$/;
-const TMP_RE = /^(.*)\.renamo-tmp(?:-(\d+))?$/;
+// "clip.mov.renamo-tmp", "clip.mov.renamo-tmp-3", and a suffix repeated by a
+// batch that ran over an earlier leftover: all of them go back to "clip.mov".
+const TMP_RE = /^(.+?)(?:\.renamo-tmp(?:-\d+)?)+$/;
 
 const loose = s => String(s).normalize('NFC').toLowerCase();
+
+// Names Windows refuses. Checked only when running on Windows: there the
+// rename would fail anyway, this just says why before touching anything.
+const WIN_BAD_CHARS = /[<>:"|?*\u0000-\u001f]/;
+const WIN_RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$/i;
+
+// The journal is a safety net: rewritten every JOURNAL_EVERY operations or
+// JOURNAL_MS milliseconds, plus before the first rename and at the very end.
+// Rewriting it after every single file made a 10 000-file batch write 16 GB.
+const JOURNAL_EVERY = 200;
+const JOURNAL_MS = 1000;
 
 function createEngine(opts = {}) {
   const fs = opts.fs || nodeFs;
   const journalPath = opts.journalPath || null;
   const now = opts.now || (() => Date.now());
+  const platform = opts.platform || process.platform;
 
   function statOrNull(p) {
     try { return fs.lstatSync(p); }
     catch (e) { if (e && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) return null; throw e; }
   }
+  // Where is this file? For reports only: an unreadable path counts as unknown.
+  function where(p) {
+    if (!p) return null;
+    try { return statOrNull(p) ? p : null; } catch (e) { return null; }
+  }
 
-  // One loose-name index per folder, kept in step with our own renames.
+  // Two stats of the same file? The inode says it; when a volume does not
+  // provide one, everything else about the file has to match.
+  function sameFile(a, b) {
+    if (!a || !b) return false;
+    if (a.ino && b.ino) return a.ino === b.ino && a.dev === b.dev;
+    return a.size === b.size && a.mtimeMs === b.mtimeMs && a.birthtimeMs === b.birthtimeMs && a.mode === b.mode;
+  }
+
+  // One index per folder, read once per batch and kept in step with our own
+  // renames: the exact names, and the names compared loosely.
   const listings = new Map();
   function listing(dir) {
     if (!listings.has(dir)) {
       let names = [];
       try { names = fs.readdirSync(dir); } catch (e) { names = []; }
-      listings.set(dir, new Set(names.map(loose)));
+      listings.set(dir, { exact: new Set(names), loose: new Set(names.map(loose)) });
     }
     return listings.get(dir);
   }
   function noteRename(from, to) {
-    const d = path.dirname(from);
-    const set = listing(d);
-    set.delete(loose(path.basename(from)));
-    set.add(loose(path.basename(to)));
+    const l = listing(path.dirname(from));
+    const fb = path.basename(from), tb = path.basename(to);
+    l.exact.delete(fb); l.loose.delete(loose(fb));
+    l.exact.add(tb); l.loose.add(loose(tb));
   }
 
-  // Is `target` free for `source`? The same file under another case or
-  // accent form counts as free (that is a case-only rename of itself).
-  function isFree(target, source) {
-    const sameName = source && loose(path.basename(target)) === loose(path.basename(source))
-      && path.dirname(target) === path.dirname(source);
-    if (sameName) return true;
-    if (statOrNull(target)) return false;
-    return !listing(path.dirname(target)).has(loose(path.basename(target)));
+  /*
+   * Is `target` free for `source`?
+   * - Same name apart from case or accents, same folder: free only if it is
+   *   the very same file. On a volume that tells case apart (Linux, a NAS,
+   *   case-sensitive APFS) "a.txt" and "A.txt" are two files.
+   * - Otherwise: nothing may answer to that name, by stat or by listing.
+   * `quick` skips the stat and trusts the listing read at the start of the
+   * batch; the stat is then made right before the rename itself.
+   */
+  function isFree(target, source, quick) {
+    const dir = path.dirname(target), tb = path.basename(target);
+    const l = listing(dir);
+    if (source && path.dirname(source) === dir && loose(tb) === loose(path.basename(source))) {
+      const sb = path.basename(source);
+      if (tb === sb) return true;
+      if (l.exact.has(tb)) return false;           // another entry has exactly that name
+      const t = statOrNull(target);
+      if (!t) return true;
+      return sameFile(statOrNull(source), t);
+    }
+    if (!quick && statOrNull(target)) return false;
+    return !l.loose.has(loose(tb));
   }
 
   function tempNameFor(from) {
@@ -95,32 +145,60 @@ function createEngine(opts = {}) {
     return null;
   }
 
+  // What is wrong with this request, if anything. null = fine.
+  function checkPair(p) {
+    if (!p || typeof p.from !== 'string' || typeof p.to !== 'string' || !p.from || !p.to) return 'invalid request';
+    if (!path.isAbsolute(p.from) || !path.isAbsolute(p.to)) return 'invalid path';
+    if (path.dirname(p.from) !== path.dirname(p.to)) return 'a file can only be renamed inside its own folder';
+    const b = path.basename(p.to);
+    if (!b || b === '.' || b === '..' || /[\\/\u0000]/.test(b)) return 'invalid name';
+    if (b.startsWith('.') && !path.basename(p.from).startsWith('.')) return 'the new name starts with a dot: the file would be hidden';
+    if (Buffer.byteLength(b, 'utf8') > 255) return 'the new name is too long';
+    if (platform === 'win32') {
+      if (WIN_BAD_CHARS.test(b)) return 'Windows does not allow < > : " | ? * in a name';
+      if (/[ .]$/.test(b)) return 'Windows does not allow a name ending with a space or a dot';
+      if (WIN_RESERVED.test(b)) return 'this name is reserved by Windows';
+    }
+    return null;
+  }
+
   // ── journal (outside the user's folders) ──────────────────────────────────
-  let journal = null;
-  function saveJournal() {
+  let journal = null, journalDirty = 0, journalAt = 0;
+  function saveJournal(force) {
     if (!journalPath || !journal) return;
+    journalDirty++;
+    if (!force && journalDirty < JOURNAL_EVERY && Date.now() - journalAt < JOURNAL_MS) return;
+    journalDirty = 0; journalAt = Date.now();
     try {
       fs.mkdirSync(path.dirname(journalPath), { recursive: true });
-      fs.writeFileSync(journalPath + '.part', JSON.stringify(journal, null, 1));
+      fs.writeFileSync(journalPath + '.part', JSON.stringify(journal));
       fs.renameSync(journalPath + '.part', journalPath);
     } catch (e) { /* the journal is a safety net; never let it block a rename */ }
   }
 
-  // Rename one file, never over something, and prove it happened.
+  /*
+   * Rename one file, never over something, never to a hidden name, and prove
+   * it happened. On a failed check the error carries `at`: where the file is
+   * now, as far as can be told (null when it cannot be found).
+   */
   function safeRename(from, to, fromStat) {
+    if (path.basename(to).startsWith('.') && !path.basename(from).startsWith('.')) {
+      const e = new Error('the new name would hide the file'); e.code = 'EHIDDEN'; throw e;
+    }
     if (!isFree(to, from)) { const e = new Error('target already exists'); e.code = 'EEXIST'; throw e; }
     fs.renameSync(from, to);
-    const after = statOrNull(to);
-    const lost = !after || (fromStat && !fromStat.isDirectory() && after.size !== fromStat.size);
-    if (lost) {
+    let after = null;
+    try { after = statOrNull(to); } catch (e) { after = null; }
+    if (!after) {
       const e = new Error('the file could not be found under its new name after renaming');
-      e.code = 'EVERIFY';
-      throw e;
+      e.code = 'EVERIFY'; e.at = where(from); throw e;
+    }
+    if (fromStat && !fromStat.isDirectory() && after.size !== fromStat.size) {
+      const e = new Error('renamed, but its size read back differs - check this file');
+      e.code = 'EVERIFY'; e.at = to; throw e;
     }
     noteRename(from, to);
   }
-
-  function where(p) { return statOrNull(p) ? p : null; }
 
   /*
    * pairs: [{ from, to }] absolute paths, each pair inside one folder.
@@ -131,24 +209,38 @@ function createEngine(opts = {}) {
     listings.clear();
     const done = [], failed = [], undo = [];
     let halted = false;
+    if (!Array.isArray(pairs)) pairs = [];
 
-    // Pre-flight: every source must exist, every target must be free (apart
-    // from names that other files of the batch are about to leave).
+    // Pre-flight: every request valid, every source there, every target free
+    // (apart from names that other files of the batch are about to leave).
+    // Nothing is touched until this pass is over.
     const items = [];
-    const leaving = new Set(pairs.map(p => loose(p.from)));
-    const targets = new Map();
+    const valid = [];
     for (const p of pairs) {
-      const st = statOrNull(p.from);
+      const bad = checkPair(p);
+      if (bad) {
+        const from = p && typeof p.from === 'string' ? p.from : '';
+        failed.push({ from, to: p && typeof p.to === 'string' ? p.to : '', error: bad, now: where(from) });
+      } else valid.push(p);
+    }
+    const leaving = new Set(valid.map(p => loose(p.from)));
+    const targets = new Set();
+    for (const p of valid) {
+      let st;
+      try { st = statOrNull(p.from); }
+      catch (e) { failed.push({ from: p.from, to: p.to, error: 'the file cannot be read (' + (e.code || e.message) + ')', now: null }); continue; }
       if (!st) { failed.push({ from: p.from, to: p.to, error: 'the file is no longer there', now: null }); continue; }
       const key = loose(p.to);
       if (targets.has(key)) { failed.push({ from: p.from, to: p.to, error: 'two files would get the same name', now: p.from }); continue; }
       const freedByBatch = leaving.has(key) && key !== loose(p.from);
-      if (!freedByBatch && !isFree(p.to, p.from)) {
-        failed.push({ from: p.from, to: p.to, error: 'a file with this name already exists', now: p.from });
-        continue;
+      let free = freedByBatch;
+      if (!free) {
+        try { free = isFree(p.to, p.from, true); }
+        catch (e) { failed.push({ from: p.from, to: p.to, error: 'the folder cannot be read (' + (e.code || e.message) + ')', now: p.from }); continue; }
       }
-      targets.set(key, true);
-      items.push({ from: p.from, to: p.to, stat: st, tmp: null, state: 'planned' });
+      if (!free) { failed.push({ from: p.from, to: p.to, error: 'a file with this name already exists', now: p.from }); continue; }
+      targets.add(key);
+      items.push({ k: items.length, from: p.from, to: p.to, stat: st, tmp: null, state: 'planned', note: null });
     }
 
     // A file only needs a temporary name if its current name is the target
@@ -158,29 +250,38 @@ function createEngine(opts = {}) {
 
     journal = { version: 2, startedAt: now(), finished: false,
       ops: items.map(i => ({ from: i.from, to: i.to, tmp: null, state: 'planned' })) };
-    saveJournal();
-    const jop = i => journal.ops[items.indexOf(i)];
+    saveJournal(true);
+    const jop = it => journal.ops[it.k];
 
     // Phase 1: step the blockers aside, under a visible name that keeps theirs.
     for (const it of blockers) {
-      const tmp = tempNameFor(it.from);
+      let tmp = null;
       try {
+        tmp = tempNameFor(it.from);
         if (!tmp) throw new Error('no free temporary name');
         safeRename(it.from, tmp, it.stat);
         it.tmp = tmp; it.state = 'temp';
-        Object.assign(jop(it), { tmp, state: 'temp' }); saveJournal();
+        Object.assign(jop(it), { tmp, state: 'temp' }); saveJournal(true);
       } catch (err) {
+        if (err.code === 'EVERIFY') {
+          halted = true;
+          if (err.at === tmp) {                 // it moved: the put-back pass below brings it home
+            it.tmp = tmp; it.state = 'temp'; it.note = err.message;
+            Object.assign(jop(it), { tmp, state: 'temp' }); saveJournal(true);
+            break;
+          }
+        }
         it.state = 'failed';
-        failed.push({ from: it.from, to: it.to, error: String(err.message || err), now: where(it.from) });
-        Object.assign(jop(it), { state: 'failed' }); saveJournal();
-        if (err.code === 'EVERIFY') { halted = true; break; }
+        failed.push({ from: it.from, to: it.to, error: String(err.message || err), now: err.code === 'EVERIFY' ? (err.at || null) : where(it.from) });
+        Object.assign(jop(it), { state: 'failed' }); saveJournal(true);
+        if (halted) break;
       }
     }
 
     // Phase 2: every file to its final name. Stop at the first anomaly.
     for (const it of items) {
       if (halted) break;
-      if (it.state === 'failed') continue;
+      if (it.state !== 'planned' && it.state !== 'temp') continue;
       const src = it.tmp || it.from;
       try {
         safeRename(src, it.to, it.stat);
@@ -189,17 +290,24 @@ function createEngine(opts = {}) {
         undo.push({ from: it.to, to: it.from });
         Object.assign(jop(it), { state: 'done' }); saveJournal();
       } catch (err) {
-        let nowAt = where(src);
+        let nowAt;
+        if (err.code === 'EVERIFY') {
+          halted = true;
+          nowAt = err.at || where(it.to) || null;
+          if (nowAt === it.to) {
+            // The rename did happen: it can be undone like the others.
+            undo.push({ from: it.to, to: it.from });
+          }
+        } else nowAt = where(src);
         // A file waiting under its temporary name goes back to its own name,
         // if that name is still free. Never over anything.
-        if (it.tmp && nowAt) {
+        if (it.tmp && nowAt === it.tmp) {
           try { safeRename(it.tmp, it.from, it.stat); nowAt = it.from; }
           catch (e2) { nowAt = where(it.tmp) || where(it.from); }
         }
         it.state = 'failed';
         failed.push({ from: it.from, to: it.to, error: String(err.message || err), now: nowAt });
-        Object.assign(jop(it), { state: nowAt === it.tmp ? 'stuck' : 'failed' }); saveJournal();
-        if (err.code === 'EVERIFY') halted = true;
+        Object.assign(jop(it), { state: nowAt === it.to ? 'unverified' : nowAt === it.tmp ? 'stuck' : 'failed' }); saveJournal(true);
       }
     }
 
@@ -207,8 +315,9 @@ function createEngine(opts = {}) {
     for (const it of items) {
       if (it.state !== 'temp') continue;
       let nowAt = it.tmp;
-      try { safeRename(it.tmp, it.from, it.stat); nowAt = it.from; } catch (e) { nowAt = where(it.tmp) || where(it.from); }
-      failed.push({ from: it.from, to: it.to, error: 'batch stopped before this file', now: nowAt });
+      try { safeRename(it.tmp, it.from, it.stat); nowAt = it.from; }
+      catch (e) { nowAt = where(it.tmp) || where(it.from); }
+      failed.push({ from: it.from, to: it.to, error: it.note || 'batch stopped before this file', now: nowAt });
       Object.assign(jop(it), { state: nowAt === it.tmp ? 'stuck' : 'failed' });
     }
     // Files never reached in phase 2 because the batch halted.
@@ -218,22 +327,21 @@ function createEngine(opts = {}) {
 
     journal.finished = true;
     journal.finishedAt = now();
-    saveJournal();
+    saveJournal(true);
     return { ok: failed.length === 0, done, failed, undo, halted };
   }
 
   // ── leftovers from interrupted batches ────────────────────────────────────
-  // Lists them straight from the folder, hidden ones included.
-  function findLeftovers(dir) {
-    let names = [];
-    try { names = fs.readdirSync(dir); } catch (e) { return []; }
+  // From a listing already in hand (hidden names included).
+  function leftoversFrom(dir, names) {
     const out = [];
-    for (const n of names) {
+    for (const n of names || []) {
       const legacy = n.match(LEGACY_TMP);
       const cur = !legacy && n.match(TMP_RE);
       if (!legacy && !cur) continue;
       const full = path.join(dir, n);
-      const st = statOrNull(full);
+      let st = null;
+      try { st = statOrNull(full); } catch (e) { st = null; }
       if (!st) continue;
       out.push({ name: n, path: full, size: st.size, mtimeMs: st.mtimeMs,
         kind: legacy ? 'legacy' : 'temp',
@@ -242,6 +350,11 @@ function createEngine(opts = {}) {
     }
     out.sort((a, b) => (a.batch || '').localeCompare(b.batch || '') || (a.index || 0) - (b.index || 0) || a.name.localeCompare(b.name));
     return out;
+  }
+  function findLeftovers(dir) {
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { return []; }
+    return leftoversFrom(dir, names);
   }
 
   // Guess an extension from the first bytes (reading only).
@@ -274,9 +387,22 @@ function createEngine(opts = {}) {
     return '';
   }
 
+  // First free name among "clip_RECOVERED.mov", "clip_RECOVERED_2.mov"...
+  function recoveredName(dir, original) {
+    const dot = original.lastIndexOf('.');
+    const base = dot > 0 ? original.slice(0, dot) : original;
+    const ext = dot > 0 ? original.slice(dot) : '';
+    for (let n = 1; n < 1000; n++) {
+      const cand = path.join(dir, base + '_RECOVERED' + (n > 1 ? '_' + n : '') + ext);
+      if (isFree(cand, null)) return cand;
+    }
+    return null;
+  }
+
   /*
    * Bring leftovers back into view. Temporary files of the current format
-   * return to their original name. Hidden files of the old format lost their
+   * return to their original name - or, if someone has taken that name since,
+   * to "<name>_RECOVERED.<ext>". Hidden files of the old format lost their
    * name, so they become RECOVERED_<n>.<ext>, in the order of the batch.
    * Only renames, never over anything.
    */
@@ -285,15 +411,20 @@ function createEngine(opts = {}) {
     const restored = [], failed = [];
     for (const f of findLeftovers(dir)) {
       let target;
-      if (f.kind === 'temp') target = path.join(dir, f.original);
-      else {
-        const ext = sniffExt(f.path);
-        const base = 'RECOVERED_' + String(f.index + 1).padStart(3, '0');
-        target = path.join(dir, base + (ext ? '.' + ext : ''));
-        if (!isFree(target, null)) target = path.join(dir, base + '_' + f.batch + (ext ? '.' + ext : ''));
-      }
-      try { safeRename(f.path, target, statOrNull(f.path)); restored.push({ from: f.path, to: target }); }
-      catch (e) { failed.push({ from: f.path, to: target, error: String(e.message || e) }); }
+      try {
+        if (f.kind === 'temp') {
+          target = path.join(dir, f.original);
+          if (f.original.startsWith('.') || !isFree(target, f.path)) target = recoveredName(dir, f.original.replace(/^\.+/, '') || 'file');
+        } else {
+          const ext = sniffExt(f.path);
+          const base = 'RECOVERED_' + String(f.index + 1).padStart(3, '0');
+          target = path.join(dir, base + (ext ? '.' + ext : ''));
+          if (!isFree(target, null)) target = path.join(dir, base + '_' + f.batch + (ext ? '.' + ext : ''));
+        }
+        if (!target) throw new Error('no free name to bring it back under');
+        safeRename(f.path, target, statOrNull(f.path));
+        restored.push({ from: f.path, to: target });
+      } catch (e) { failed.push({ from: f.path, to: target || f.path, error: String(e.message || e) }); }
     }
     return { restored, failed };
   }
@@ -303,7 +434,7 @@ function createEngine(opts = {}) {
     try { return JSON.parse(fs.readFileSync(journalPath, 'utf8')); } catch (e) { return null; }
   }
 
-  return { renameBatch, findLeftovers, recoverLeftovers, sniffExt, readJournal, TMP_SUFFIX };
+  return { renameBatch, findLeftovers, leftoversFrom, recoverLeftovers, sniffExt, readJournal, checkPair, TMP_SUFFIX };
 }
 
-module.exports = { createEngine, TMP_SUFFIX, LEGACY_TMP };
+module.exports = { createEngine, TMP_SUFFIX, LEGACY_TMP, TMP_RE };

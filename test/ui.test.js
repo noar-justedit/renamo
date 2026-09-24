@@ -100,4 +100,51 @@ t('the main action uses the tinted green of the charter', () => {
   assert.ok(/#btn-rename\{[^}]*background:#0f2c1d/.test(block));
 });
 
+
+// ── 1.6.4 ──────────────────────────────────────────────────────────────────
+t('dropping files shows a blue ring, never the accent', () => {
+  assert.ok(/body\.dropping #center\{box-shadow:inset 0 0 0 2px var\(--blue\)/.test(block));
+  assert.ok(/body\.dropping #main\{box-shadow:none/.test(block));
+});
+
+t('every control is a real button the keyboard reaches', () => {
+  for (const id of ['btn-up', 'chk-all', 'rp-case', 'rx-icase', 'lnk-github', 'lnk-about']) {
+    assert.ok(/^<button/.test(tagOf(id)), '#' + id + ' is not a button');
+  }
+  assert.ok(!/<span class="sw"/.test(html), 'a switch is still a span');
+  assert.ok(!/<div class="seg"[^>]*>\s*<span/.test(html), 'a two-way choice is still made of spans');
+  assert.ok(/role="switch"/.test(html) && /role="radiogroup"/.test(html));
+});
+
+t('buttons show the charter focus ring for the keyboard', () => {
+  assert.ok(/\.btn:focus-visible[^{]*\{[^}]*box-shadow:inset 0 0 0 1px rgba\(255,255,255,\.18\)/.test(block));
+});
+
+t('one disabled look for both footer buttons, and the main action in sentence case', () => {
+  assert.ok(/\.btn\[disabled\],#btn-rename\[disabled\]\{/.test(block));
+  assert.ok(/#btn-rename\{text-transform:none/.test(block));
+});
+
+t('hollows use the hollow radius', () => {
+  assert.ok(/\.row,\.tnode,#leftovers,\.rep-row\{border-radius:var\(--r-ins\)/.test(block));
+});
+
+t('a report closes with its buttons only (no Escape, no click on the veil)', () => {
+  const rep = script.slice(script.indexOf('function showReport'), script.indexOf('// ---- leftovers'));
+  assert.ok(rep.length > 100, 'showReport not found');
+  assert.ok(!/Escape/.test(rep), 'showReport closes on Escape');
+  assert.ok(!/ov\.onclick/.test(rep), 'showReport closes on a click on the veil');
+  const upd = script.slice(script.indexOf('function showUpdateNotice'), script.indexOf('// ── About'));
+  assert.ok(!/ov\.onclick/.test(upd), 'the update notice closes on a click on the veil');
+});
+
+t('the file list is virtual: rows are drawn for the screen only', () => {
+  assert.ok(/function renderWindow\(/.test(script) && /OVERSCAN/.test(script));
+  assert.ok(!/list\.innerHTML = html/.test(script), 'the whole list is still written at once');
+});
+
+t('the folder button follows the system', () => {
+  assert.ok(/'Explorer'/.test(script) && /'Finder'/.test(script));
+});
+
 console.log(passed + ' charter checks passed' + (process.exitCode ? ' — with failures above' : ''));
