@@ -20,6 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const https = require('https');
+const { linuxVolumes } = require('./volumes-linux');
 
 // Folder listings are sorted once with one collator (creating the comparison
 // options for every pair made a 10 000-file sort 15 times slower).
@@ -146,6 +147,7 @@ function createWindow() {
       devTools: !app.isPackaged,
     },
   };
+  if (process.platform === 'linux') opts.icon = path.join(__dirname, 'icon.png');
   if (isMac) {
     opts.titleBarStyle = 'hiddenInset';
     opts.trafficLightPosition = { x: 14, y: 14 };
@@ -227,7 +229,17 @@ ipcMain.handle('list-volumes', async () => {
     try { out.push({ name: 'Home', path: os.homedir(), type: 'home' }); } catch (e) {}
     return out;
   }
-  // macOS / Linux
+  if (process.platform === 'linux') {
+    out.push({ name: 'Computer', path: '/', type: 'system' });
+    let mounts = '', gvfsNames = [];
+    const gvfsDir = '/run/user/' + (typeof process.getuid === 'function' ? process.getuid() : 1000) + '/gvfs';
+    try { mounts = fs.readFileSync('/proc/mounts', 'utf8'); } catch (e) {}
+    try { gvfsNames = fs.readdirSync(gvfsDir); } catch (e) {}
+    for (const v of linuxVolumes(mounts, gvfsDir, gvfsNames)) out.push(v);
+    try { out.push({ name: 'Home', path: os.homedir(), type: 'home' }); } catch (e) {}
+    return out;
+  }
+  // macOS
   try {
     out.push({ name: 'Macintosh HD', path: '/', type: 'system' });
   } catch (e) {}

@@ -420,7 +420,7 @@ t('the journal lives outside the renamed folder', () => {
 t('no delete, copy, truncate or write call on user files anywhere in the app', () => {
   const src = f => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
   const forbidden = /\b(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync|truncate|truncateSync|ftruncate|copyFile|copyFileSync|cp|cpSync|appendFile|appendFileSync|createWriteStream)\s*\(/;
-  for (const f of ['main.js', 'preload.js', 'rename-engine.js']) {
+  for (const f of ['main.js', 'preload.js', 'rename-engine.js', 'volumes-linux.js']) {
     const code = src(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     const m = code.match(forbidden);
     assert.ok(!m, f + ' calls ' + (m && m[1]));

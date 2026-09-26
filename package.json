@@ -1,19 +1,20 @@
 {
   "name": "renamo",
-  "version": "1.6.4",
+  "version": "1.7.0",
   "description": "Batch file renamer",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/engine.test.js && node test/ui.test.js && node test/safety.test.js",
+    "test": "node test/engine.test.js && node test/ui.test.js && node test/safety.test.js && node test/linux.test.js",
     "build:mac": "electron-builder --mac --arm64",
     "build:mac-universal": "electron-builder --mac dmg --universal",
-    "build:win": "electron-builder --win --x64"
+    "build:win": "electron-builder --win --x64",
+    "build:linux": "electron-builder --linux AppImage deb --x64"
   },
   "build": {
     "appId": "com.justedit.renamo",
     "productName": "renamo",
-    "copyright": "Copyright \u00a9 2026 just edit",
+    "copyright": "Copyright © 2026 just edit",
     "afterSign": "scripts/notarize.js",
     "files": [
       "src/**/*",
@@ -104,13 +105,59 @@
       "shortcutName": "renamo",
       "license": "build/license.txt",
       "artifactName": "renamo-Setup-${version}.exe"
+    },
+    "linux": {
+      "icon": "build/icons",
+      "category": "Utility;FileTools",
+      "maintainer": "just edit <contact@just-edit.fr>",
+      "vendor": "just edit",
+      "synopsis": "Batch rename files and folders with a live preview",
+      "description": "Batch rename files and folders with a live preview. renamo only ever renames: it never deletes, never overwrites and never hides a file.",
+      "executableName": "renamo",
+      "desktop": {
+        "entry": {
+          "Keywords": "rename;batch;files;"
+        }
+      },
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "renamo-${version}-linux-${arch}.${ext}",
+      "syncDesktopName": true
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libsecret-1-0"
+      ],
+      "artifactName": "renamo_${version}_amd64.deb",
+      "packageCategory": "utils"
+    },
+    "appImage": {
+      "artifactName": "renamo-${version}-x86_64.AppImage"
     }
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
     "electron": "^42.0.0",
-    "electron-builder": "^26.15.3",
-    "dmg-license": "^1.0.11"
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {},
   "author": "just edit",
@@ -122,5 +169,9 @@
   "homepage": "https://github.com/noar-justedit/renamo",
   "bugs": {
     "url": "https://github.com/noar-justedit/renamo/issues"
-  }
+  },
+  "optionalDependencies": {
+    "dmg-license": "^1.0.11"
+  },
+  "desktopName": "renamo.desktop"
 }

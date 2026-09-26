@@ -2,7 +2,7 @@
 
 Batch rename files and folders with a live preview. Build a new name from independent rules, then see the result before you commit.
 
-macOS and Windows. Built with Electron. No dependencies, no sign-up.
+macOS, Windows and Linux. Built with Electron. No dependencies, no sign-up.
 
 ![renamo screenshot](screenshots/renamo.png)
 
@@ -65,11 +65,41 @@ tests, signing, notarization, stapling and verification:
 ./build.sh --no-notarize   unsigned macOS build, local testing only
 ./build.sh --setup         re-enter the Apple credentials
 npm test                   rename-engine checks alone, no build
+bash build-linux.sh        Linux AppImage + .deb (on Linux)
 ```
 
 Each build only replaces the files of the platform it builds, so a Windows build
 keeps the Mac DMG in `dist/` and the other way round. Two builds cannot run at the
 same time in the same folder: the second one stops and says so.
+
+### Linux
+
+The Linux packages are built **on a Linux machine** (x64). Building them from macOS
+is not supported: the `.deb` produced there does not install.
+
+```
+bash build-linux.sh
+```
+
+It checks Node (20.19 or newer, 22 LTS recommended; the script explains how to get it
+if the system one is too old) and the two tools the `.deb` needs
+(`sudo apt install dpkg fakeroot`), runs the tests, then builds into `dist/`:
+
+| File | What it is |
+|---|---|
+| `renamo-<version>-x86_64.AppImage` | runs on any distribution, nothing to install |
+| `renamo_<version>_amd64.deb` | Debian, Ubuntu, Pop!_OS, Mint: adds renamo to the menu |
+
+Install the `.deb` with `sudo apt install ./renamo_<version>_amd64.deb`. Run the
+AppImage with `chmod +x renamo-*.AppImage && ./renamo-*.AppImage`; if it does not
+start, install FUSE 2 (`sudo apt install libfuse2t64` on Ubuntu 24.04 and newer,
+`libfuse2` before). The Linux packages are not signed.
+
+On Linux the disk column lists the root, cards and USB drives (`/media`,
+`/run/media`), fixed and network mounts (`/mnt`, SMB/CIFS, NFS, SSHFS from
+`/proc/mounts`), shares opened from the file manager (`/run/user/<uid>/gvfs`) and
+the home folder. Most Linux volumes tell upper and lower case apart: renamo checks
+for that and never renames `clip.mov` onto an existing `Clip.mov`.
 
 `build-win.sh` still exists for a Windows-only build without touching build.sh.
 The scripts are committed with the executable bit set; if your copy came from an
