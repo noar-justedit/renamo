@@ -536,6 +536,25 @@ body.dropping #center{box-shadow:inset 0 0 0 2px var(--blue);}
 /* About window: the update setting. */
 button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);border-radius:var(--r-ins);
   padding:10px 12px;margin:0 0 16px;font-size:12.5px;color:var(--text2);cursor:pointer;width:100%;text-align:left;}
+/* 9 ── Names: select a part, right-click menu, edit one name ─────────────── */
+/* The page is not selectable, but the name of a file is: drag over a part of it
+   to take it as the search. The highlight is blue, the colour of information. */
+.row .cur .nm{user-select:text;-webkit-user-select:text;}
+.row .cur .nm::selection{background:rgba(77,144,240,.35);color:var(--text);}
+/* The right-click menu floats like the toast: raised surface, no line. */
+#ctx{position:fixed;z-index:10000;min-width:210px;background:var(--raise);border-radius:var(--r-ins);padding:6px;
+  box-shadow:0 18px 44px rgba(0,0,0,.6);-webkit-app-region:no-drag;}
+#ctx button{display:block;width:100%;text-align:left;background:transparent;border:none;margin:0;font:inherit;
+  font-size:12.5px;color:var(--text2);padding:8px 10px;border-radius:var(--r-field);cursor:pointer;}
+#ctx button:hover,#ctx button:focus-visible{background:var(--ins);color:var(--text);outline:none;}
+#ctx button:focus-visible{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+#ctx button[disabled]{color:var(--text4);background:transparent;cursor:default;}
+/* The name window: a decision, so it keeps its buttons (like a report). */
+#edit-ov{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.7);-webkit-app-region:no-drag;}
+#edit-ov .fld{margin:0 0 8px;}
+#edit-ov .edit-err{min-height:32px;font-size:12px;line-height:1.4;color:var(--red);margin-bottom:8px;}
+#edit-ov .upd-btn[disabled]{color:var(--text4);cursor:default;}
 /* ═══ end of the charter block ═══ */
 </style>
 </head>
@@ -761,7 +780,7 @@ button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);bo
   <div class="foot-left">
     <span id="status">No selection</span>
     <div class="foot-meta">
-      <span class="fm-ver" id="fm-ver">v1.7.0</span>
+      <span class="fm-ver" id="fm-ver">v1.8.0</span>
       <span class="fm-sep">·</span>
       <button type="button" class="fm-link" id="lnk-github">GitHub</button>
       <span class="fm-sep">·</span>
@@ -1345,6 +1364,129 @@ async function doUndo(){
   reportBatch(res, 'restored');
 }
 
+// ---- a name: take a part of it as the search, or edit it ----
+// The text selected inside ONE name of the list, or ''.
+function nameSelection(){
+  const s=window.getSelection();
+  if(!s || s.isCollapsed || !s.rangeCount) return '';
+  const nm=n=>{ const el=n && (n.nodeType===1 ? n : n.parentElement); return el && el.closest ? el.closest('#list .nm') : null; };
+  const a=nm(s.anchorNode), f=nm(s.focusNode);
+  return a && a===f ? s.toString() : '';
+}
+// Right-click on a row: a small menu. It closes with Escape, a click elsewhere,
+// a scroll or the window losing focus.
+function closeCtx(){
+  const m=document.getElementById('ctx'); if(m) m.remove();
+  document.removeEventListener('mousedown', ctxAway, true);
+  document.removeEventListener('keydown', ctxKey, true);
+  window.removeEventListener('blur', closeCtx);
+  window.removeEventListener('resize', closeCtx);
+  const l=document.getElementById('list'); if(l) l.removeEventListener('scroll', closeCtx);
+}
+function ctxAway(e){ if(!e.target.closest || !e.target.closest('#ctx')) closeCtx(); }
+function ctxKey(e){
+  const m=document.getElementById('ctx'); if(!m) return;
+  if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); closeCtx(); return; }
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+  e.preventDefault();
+  const bs=[...m.querySelectorAll('button:not([disabled])')]; if(!bs.length) return;
+  const k=bs.indexOf(document.activeElement);
+  bs[(k+(e.key==='ArrowDown'?1:bs.length-1))%bs.length].focus();
+}
+function openCtx(x, y, path, text){
+  closeCtx();
+  const m=document.createElement('div'); m.id='ctx'; m.setAttribute('role','menu');
+  const item=(label, on, run)=>{
+    const b=document.createElement('button'); b.type='button'; b.setAttribute('role','menuitem'); b.textContent=label;
+    if(!on) b.disabled=true; else b.onclick=()=>{ closeCtx(); run(); };
+    m.appendChild(b); return b;
+  };
+  item('Use selection as search', !!text, ()=>useAsSearch(text));
+  item('Edit name…', true, ()=>showEditName(path));
+  document.body.appendChild(m);
+  const r=m.getBoundingClientRect();
+  m.style.left=Math.max(6, Math.min(x, window.innerWidth-r.width-6))+'px';
+  m.style.top=Math.max(6, Math.min(y, window.innerHeight-r.height-6))+'px';
+  document.addEventListener('mousedown', ctxAway, true);
+  document.addEventListener('keydown', ctxKey, true);
+  window.addEventListener('blur', closeCtx);
+  window.addEventListener('resize', closeCtx);
+  document.getElementById('list').addEventListener('scroll', closeCtx);
+  const first=m.querySelector('button:not([disabled])'); if(first) first.focus();
+}
+document.getElementById('list').addEventListener('contextmenu', e=>{
+  const row=e.target.closest('.row'); if(!row || modalOpen()) return;
+  e.preventDefault();
+  flushPendingClick();
+  openCtx(e.clientX, e.clientY, row.dataset.path, nameSelection());
+});
+// The selected part becomes the Replace rule's search; the cursor goes to the
+// replacement, so typing continues from there. "Match case" is left as it is.
+function useAsSearch(text){
+  setRule('replace', true);
+  const f=document.getElementById('rp-search'); f.value=text;
+  recompute();
+  const r=document.getElementById('rp-replace'); r.focus();
+}
+// One file or folder renamed on its own, now, with no batch preview. It goes
+// through the same engine as a batch: same checks, same Undo.
+function showEditName(path){
+  if(document.getElementById('edit-ov')) return;
+  const entry=allEntries.find(x=>x.path===path); if(!entry) return;
+  const dir=currentDir;
+  const ov=document.createElement('div'); ov.id='edit-ov';
+  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+  const card=document.createElement('div'); card.className='upd-card';
+  const h=document.createElement('div'); h.className='upd-h'; h.textContent='Edit name';
+  const sub=document.createElement('div'); sub.className='upd-sub';
+  sub.textContent='This '+(entry.isDir?'folder':'file')+' is renamed right away, outside the batch. Undo brings the old name back.';
+  const input=document.createElement('input'); input.className='fld'; input.id='edit-name'; input.value=entry.name;
+  input.spellcheck=false; input.setAttribute('autocomplete','off'); input.setAttribute('aria-label','New name');
+  const err=document.createElement('div'); err.className='edit-err'; err.setAttribute('role','alert');
+  const act=document.createElement('div'); act.className='upd-actions';
+  const cancel=document.createElement('button'); cancel.type='button'; cancel.className='upd-btn'; cancel.textContent='Cancel';
+  const go=document.createElement('button'); go.type='button'; go.className='upd-btn upd-go'; go.textContent='Rename';
+  act.appendChild(cancel); act.appendChild(go);
+  card.appendChild(h); card.appendChild(sub); card.appendChild(input); card.appendChild(err); card.appendChild(act);
+  ov.appendChild(card); document.body.appendChild(ov);
+  let busyNow=false;
+  // What the preview already knows: the same checks, in words, before the engine.
+  const problem=()=>{
+    const v=input.value;
+    if(v===entry.name) return { quiet:true };
+    const p=nameProblem(v); if(p) return { why:p };
+    const k=looseName(v);
+    if(allEntries.some(x=>x.path!==entry.path && x._k===k)) return { why:'A file with this name is already in the folder' };
+    return null;
+  };
+  const check=()=>{ const p=problem(); err.textContent = p && p.why ? p.why : ''; go.disabled = busyNow || !!p; };
+  input.addEventListener('input', check);
+  const close=()=>ov.remove();
+  cancel.onclick=close;
+  const submit=async()=>{
+    if(busyNow || problem()) return;
+    busyNow=true; check();
+    const to=api.join(dir, input.value);
+    const res=await callEngine(api.renameBatch, [{ from:entry.path, to }]);
+    res.done=res.done||[]; res.failed=res.failed||[]; res.undo=res.undo||[];
+    // Refused with nothing touched: say why, and let the name be corrected.
+    if(!res.done.length && res.failed.length===1 && !res.halted && !res.error){
+      busyNow=false; check(); err.textContent=res.failed[0].error; input.focus(); return;
+    }
+    close();
+    if(res.undo.length) lastUndo={ dir, pairs:res.undo };
+    const keep=[...selected].map(q=>q===entry.path ? to : q);
+    await openDir(dir, { select: res.done.length ? keep : [...selected] });
+    reportBatch(res, 'renamed');
+  };
+  go.onclick=submit;
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
+  check();
+  input.focus();
+  const dot=entry.isDir ? -1 : entry.name.lastIndexOf('.');
+  input.setSelectionRange(0, dot>0 ? dot : entry.name.length);
+}
+
 // ---- after a batch: a toast when all went well, a full report otherwise ----
 // Every file that was not renamed is listed with the reason and, above all,
 // where it is right now. Nothing is ever left unaccounted for.
@@ -1523,6 +1665,8 @@ document.getElementById('list').addEventListener('click', e=>{
     window.getSelection && window.getSelection().removeAllRanges();
     selectRange(i); focusIndex=i; renderWindow(); return;
   }
+  // Dragging over a name selects some of its text: that is not a click on the row.
+  if(e.detail===1 && e.target.closest('.nm') && nameSelection()){ flushPendingClick(); return; }
   focusIndex = i;
   if(e.target.closest('.cbox')){ flushPendingClick(); setAnchor(i); toggleSelect(path); return; }
   if(isDir){
@@ -1623,7 +1767,7 @@ document.getElementById('wc-close').addEventListener('click', ()=>{ try{ api.win
 // The list keys work when the list (or nothing in particular) has the focus.
 // A focused button keeps Space and Enter for itself, and an open window
 // keeps the keyboard away from the list behind it.
-function modalOpen(){ return !!document.querySelector('#report-ov,#update-ov,#about-ov'); }
+function modalOpen(){ return !!document.querySelector('#report-ov,#update-ov,#about-ov,#edit-ov,#ctx'); }
 document.addEventListener('keydown', e=>{
   if(modalOpen()) return;
   const mod = e.metaKey || e.ctrlKey;

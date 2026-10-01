@@ -10,6 +10,12 @@
 #   ./scripts/build.sh --skip-tests    skip the rename-engine tests
 #   ./scripts/build.sh --setup         re-enter the Apple credentials, then exit
 #
+# The project lives on the NAS, where a build is slow and unreliable. The build
+# runs in a work folder on this Mac's own disk (default: renamo-build in the system
+# temporary folder; RENAMO_BUILD_DIR picks another parent folder). Only when
+# everything has succeeded are the finished files copied back into dist/ here: a
+# failed build leaves dist/ exactly as it was.
+#
 # The first signed build asks for your Apple ID and an app-specific password, then
 # stores them in your keychain under the "renamo-notarization" profile. It never
 # asks again, and nothing secret is written into this folder.
@@ -19,6 +25,7 @@ set -euo pipefail
 # Resolve the script before moving: $0 may be relative to the caller's directory.
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$SELF")/.."
+ROOT="$(pwd)"                     # the project, on the NAS
 
 APP="renamo"
 PROFILE="${NOTARY_PROFILE:-renamo-notarization}"
@@ -36,7 +43,7 @@ for arg in ${1+"$@"}; do
     --no-notarize) NOTARIZE=0 ;;
     --skip-tests)  DO_TESTS=0 ;;
     --setup)       SETUP_ONLY=1 ;;
-    -h|--help)     sed -n "2,16p" "$SELF"; exit 0 ;;
+    -h|--help)     sed -n "2,21p" "$SELF"; exit 0 ;;
     *) echo "  Unknown option: $arg   (try ./scripts/build.sh --help)"; exit 1 ;;
   esac
 done
@@ -149,11 +156,70 @@ notarize_file() {
   info "Done."
 }
 
+# ── the work folder, on this Mac's disk ──────────────────────────────────────
+WORK_PARENT="${RENAMO_BUILD_DIR:-${TMPDIR:-/tmp}}"
+WORK="${WORK_PARENT%/}/renamo-build"
+LOCK="$WORK/.build.lock"
+
+check_work_folder() {
+  case "$WORK" in /*/renamo-build) ;; *) die "the work folder must be an absolute path ending in /renamo-build (got: $WORK)." ;; esac
+  case "$WORK/" in "$ROOT"/*) die "the work folder must be outside the project (got: $WORK)." ;; esac
+}
+
+# Only the files a build needs go to the work folder. A folder is mirrored, so a
+# file removed from the project disappears from the work folder too; node_modules
+# and dist live in the work folder and are never touched by the mirror.
+sync_to_work() {
+  check_work_folder
+  step "Copying the project to $WORK ..."
+  mkdir -p "$WORK"
+  local d f
+  for d in src build scripts test; do
+    if [ -d "$ROOT/$d" ]; then
+      rsync -a --delete --exclude '.DS_Store' "$ROOT/$d/" "$WORK/$d/" || die "could not copy $d/ to the work folder."
+    fi
+  done
+  for f in package.json package-lock.json version.json LICENSE README.md; do
+    if [ -f "$ROOT/$f" ]; then
+      cp -p "$ROOT/$f" "$WORK/$f" || die "could not copy $f to the work folder."
+    fi
+  done
+}
+
 install_deps() {
-  if [ ! -d node_modules ]; then
+  local h; h=$(shasum package.json | cut -d' ' -f1)
+  if [ ! -d node_modules ] || [ "$(cat .deps-hash 2>/dev/null || true)" != "$h" ]; then
     step "Installing dependencies..."
     npm install
+    printf '%s' "$h" > .deps-hash
   fi
+}
+
+# Copy one finished file into the project's dist/ and prove the copy is identical.
+put_in_dist() {
+  local f="$1" dest="$ROOT/dist/$(basename "$1")"
+  cp -p "$f" "$dest" || die "could not copy $(basename "$f") into $ROOT/dist."
+  cmp -s "$f" "$dest" || die "the copy of $(basename "$f") in dist/ differs from the original. Do not ship it."
+  info "copied  $(basename "$f")"
+}
+
+# Called once a platform has been built and checked. The outputs of that platform
+# only are replaced in dist/: a Windows build leaves the Mac DMG alone, and back.
+publish_mac() {
+  step "Copying the finished files to $ROOT/dist ..."
+  mkdir -p "$ROOT/dist"
+  rm -rf "$ROOT"/dist/mac-arm64 "$ROOT"/dist/mac "$ROOT"/dist/*-mac-*.dmg "$ROOT"/dist/*-mac-*.dmg.blockmap
+  local f
+  for f in dist/*-mac-*.dmg dist/*-mac-*.dmg.blockmap; do [ -e "$f" ] && put_in_dist "$f"; done
+  return 0
+}
+publish_win() {
+  step "Copying the finished files to $ROOT/dist ..."
+  mkdir -p "$ROOT/dist"
+  rm -rf "$ROOT"/dist/win-unpacked "$ROOT"/dist/*.exe "$ROOT"/dist/*.exe.blockmap "$ROOT"/dist/*-win-*.zip "$ROOT"/dist/latest.yml
+  local f
+  for f in dist/*.exe dist/*.exe.blockmap dist/*-win-*.zip dist/latest.yml; do [ -e "$f" ] && put_in_dist "$f"; done
+  return 0
 }
 
 run_tests() {
@@ -200,8 +266,14 @@ build_windows() {
 # ── dev mode ─────────────────────────────────────────────────────────────────
 if [ "$DEV" = "1" ]; then
   banner
-  need_node; install_deps
-  step "Launching in dev mode..."
+  need_node
+  if [ -d "$LOCK" ] && kill -0 "$(cat "$LOCK/pid" 2>/dev/null || echo 0)" 2>/dev/null; then
+    die "a build is running in the work folder. Wait for it to finish."
+  fi
+  sync_to_work
+  cd "$WORK"
+  install_deps
+  step "Launching in dev mode (from a copy of the project: restart to see new edits)..."
   npm start
   exit 0
 fi
@@ -235,24 +307,26 @@ if [ "$DO_MAC" = "1" ]; then
   fi
 fi
 
-install_deps
-run_tests
-
-# Only one build at a time: two builds running together in the same folder
+# Only one build at a time: two builds running together in the same work folder
 # overwrite each other's files, and the macOS one then fails to find its app.
-LOCK=".build.lock"
+check_work_folder
+mkdir -p "$WORK"
 if ! mkdir "$LOCK" 2>/dev/null; then
   OTHER=$(cat "$LOCK/pid" 2>/dev/null || true)
   if [ -n "$OTHER" ] && kill -0 "$OTHER" 2>/dev/null; then
-    die "another build is already running in this folder (process $OTHER). Wait for it to finish."
+    die "another build is already running (process $OTHER). Wait for it to finish."
   fi
   info "A previous build was interrupted; taking over its lock."
 fi
 echo $$ > "$LOCK/pid"
 trap 'rm -rf "$LOCK"' EXIT
 
-# Clear only the output of the platform being built: a Windows build leaves the
-# Mac DMG in dist/ untouched, and the other way round.
+sync_to_work
+cd "$WORK"
+install_deps
+run_tests
+
+# Clear only the output of the platform being built, in the work folder.
 mkdir -p dist
 if [ "$DO_MAC" = "1" ]; then
   rm -rf dist/mac-arm64 dist/mac dist/*-mac-*.dmg dist/*-mac-*.dmg.blockmap
@@ -309,10 +383,12 @@ if [ "$DO_MAC" = "1" ]; then
       die "Gatekeeper refuses this disk image. Do not ship it."
     fi
   fi
+  publish_mac
 fi
 
 if [ "$DO_WIN" = "1" ]; then
   build_windows
+  publish_win
 fi
 
 # ── summary ──────────────────────────────────────────────────────────────────
@@ -321,17 +397,17 @@ printf '\n  Done in %dm%02ds.\n\n' $((ELAPSED / 60)) $((ELAPSED % 60))
 if [ "$DO_MAC" = "1" ]; then
   if [ "$NOTARIZE" = "1" ]; then
     info "READY TO SHIP"
-    info "  $DMG"
+    info "  $ROOT/$DMG"
     info "  signed, notarized and stapled - it opens with a double-click on any Mac."
   else
     info "NOT SHIPPABLE: unsigned build."
-    info "  $DMG"
+    info "  $ROOT/$DMG"
     info "  first launch needs right-click > Open. Re-run ./scripts/build.sh for a real release."
   fi
 fi
 if [ "$DO_WIN" = "1" ]; then
   printf '\n'
   info "Windows (unsigned, SmartScreen shows a warning):"
-  ls -1 dist/*"$VERSION"*.exe dist/*"$VERSION"-win-*.zip 2>/dev/null | sed 's/^/    /' || info "  (check dist/)"
+  ls -1 "$ROOT"/dist/*"$VERSION"*.exe "$ROOT"/dist/*"$VERSION"-win-*.zip 2>/dev/null | sed 's/^/    /' || info "  (check dist/)"
 fi
 printf '\n'

@@ -147,4 +147,33 @@ t('the folder button follows the system', () => {
   assert.ok(/'Explorer'/.test(script) && /'Finder'/.test(script));
 });
 
+// ── names: select a part, right-click menu, edit one name ───────────────────
+t('the name of a file can be selected, in blue (information), not the accent', () => {
+  assert.ok(/\.row \.cur \.nm\{[^}]*user-select:text/.test(block), 'names are not selectable');
+  const sel = block.match(/\.row \.cur \.nm::selection\{[^}]*\}/);
+  assert.ok(sel && /77,144,240/.test(sel[0]) && !/--accent/.test(sel[0]), 'selection is not blue');
+});
+
+t('the right-click menu is made of menu items, floats on --raise, and closes with Escape', () => {
+  const m = script.slice(script.indexOf('function closeCtx'), script.indexOf('// ---- after a batch'));
+  assert.ok(/setAttribute\('role','menuitem'\)/.test(m) && /setAttribute\('role','menu'\)/.test(m));
+  assert.ok(/e\.key==='Escape'/.test(m), 'the menu does not close on Escape');
+  assert.ok(/#ctx\{[^}]*background:var\(--raise\)/.test(block), 'the menu is not on the raised surface');
+  assert.ok(!/#ctx[^{]*\{[^}]*border:\s*[^n}]/.test(block), 'the menu has a border');
+});
+
+t('the name window keeps its buttons only, and renames through the engine', () => {
+  const w = script.slice(script.indexOf('function showEditName'), script.indexOf('// ---- after a batch'));
+  assert.ok(w.length > 500, 'showEditName not found');
+  assert.ok(!/Escape/.test(w), 'the name window closes on Escape');
+  assert.ok(!/ov\.onclick/.test(w), 'the name window closes on a click on the veil');
+  assert.ok(/callEngine\(api\.renameBatch/.test(w), 'the name is not renamed through the engine');
+  assert.ok(/nameProblem\(/.test(w), 'the preview checks are not applied');
+});
+
+t('the list keys stay quiet while the menu or the name window is open', () => {
+  const m = script.match(/function modalOpen\(\)\{[^}]*\}/);
+  assert.ok(m && /#edit-ov/.test(m[0]) && /#ctx/.test(m[0]));
+});
+
 console.log(passed + ' charter checks passed' + (process.exitCode ? ' — with failures above' : ''));

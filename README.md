@@ -68,6 +68,12 @@ npm test                   rename-engine checks alone, no build
 bash scripts/build-linux.sh        Linux AppImage + .deb (on Linux)
 ```
 
+The build does not run in the project folder, which may sit on a network drive: the
+script copies the project to a work folder on the Mac's own disk (`renamo-build` in
+the system temporary folder, or inside the folder named by `RENAMO_BUILD_DIR`),
+builds there, and copies the finished files into `dist/` only once everything has
+succeeded. A failed build leaves `dist/` as it was.
+
 Each build only replaces the files of the platform it builds, so a Windows build
 keeps the Mac DMG in `dist/` and the other way round. Two builds cannot run at the
 same time in the same folder: the second one stops and says so.
