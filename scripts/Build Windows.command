@@ -10,9 +10,9 @@
 # -----------------------------------------------------------------------------
 
 # Finder starts the Terminal in your home folder, so move to this file's folder.
-cd "$(dirname "${BASH_SOURCE[0]}")" || { echo "Cannot reach the renamo folder."; exit 1; }
+cd "$(dirname "${BASH_SOURCE[0]}")/.." || { echo "Cannot reach the renamo folder."; exit 1; }
 
-./build.sh --win
+./scripts/build.sh --win
 STATUS=$?
 
 echo

@@ -68,7 +68,7 @@ t('the macOS-only package cannot stop an install on Linux or Windows', () => {
 });
 
 t('build-linux.sh is executable and refuses to run anywhere but Linux', () => {
-  const f = path.join(__dirname, '..', 'build-linux.sh');
+  const f = path.join(__dirname, '..', 'scripts', 'build-linux.sh');
   assert.ok(fs.statSync(f).mode & 0o111, 'not executable');
   const s = fs.readFileSync(f, 'utf8');
   assert.ok(/uname -s\)" = "Linux"/.test(s));

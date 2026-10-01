@@ -3,9 +3,9 @@
 # renamo . Build the Windows version from macOS
 # -----------------------------------------------------------------------------
 # Place this file inside the "renamo/" folder, then:
-#   chmod +x build-win.sh
-#   ./build-win.sh            -> NSIS installer (.exe) + portable .zip
-#   ./build-win.sh --zip      -> portable .zip only (does NOT need Wine)
+#   chmod +x scripts/build-win.sh
+#   ./scripts/build-win.sh            -> NSIS installer (.exe) + portable .zip
+#   ./scripts/build-win.sh --zip      -> portable .zip only (does NOT need Wine)
 #
 # The .exe installer is assembled with Wine on macOS. Install it once if needed:
 #   brew install --cask wine-stable
@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 VERSION=$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo "?")
 echo ""
@@ -48,7 +48,7 @@ else
     echo ""
     echo "  Wine was not found. The NSIS installer (.exe) needs Wine on macOS."
     echo "  Install it once with:  brew install --cask wine-stable"
-    echo "  Then re-run:           ./build-win.sh"
+    echo "  Then re-run:           ./scripts/build-win.sh"
     echo ""
     echo "  For now, building the portable .zip instead (no Wine required)..."
     build_zip

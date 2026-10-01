@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # renamo . Build the Linux packages. Run this ON a Linux machine (x64).
 # -----------------------------------------------------------------------------
-#   bash build-linux.sh
+#   bash scripts/build-linux.sh
 #
 # Output, in dist/:
 #   renamo-<version>-x86_64.AppImage   runs on any distribution, no install
@@ -14,7 +14,7 @@
 # -----------------------------------------------------------------------------
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 step() { printf '\n  %s\n' "$*"; }
 info() { printf '  %s\n' "$*"; }

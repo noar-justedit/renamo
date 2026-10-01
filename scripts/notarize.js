@@ -37,7 +37,7 @@ function assertDeveloperIdSignature(appPath) {
     'The app is ' + (adhoc ? 'not signed with' : 'missing') + ' a Developer ID Application certificate, ' +
     'so Apple would reject it.\n' +
     '  - check the certificate is in your login keychain:  security find-identity -v -p codesigning\n' +
-    '  - or build without notarizing:                      ./build.sh --no-notarize\n' +
+    '  - or build without notarizing:                      ./scripts/build.sh --no-notarize\n' +
     '  what codesign reported for ' + appPath + ':\n' +
     (report.trim() ? report.trim().split('\n').slice(0, 12).map(l => '    ' + l).join('\n') : '    (nothing)') + '\n'
   );

@@ -2,13 +2,13 @@
 # -----------------------------------------------------------------------------
 # renamo - build script (macOS)
 # -----------------------------------------------------------------------------
-#   ./build.sh                 everything: checks, tests, signed and notarized DMG
-#   ./build.sh --all           the same, plus the Windows build
-#   ./build.sh --win           Windows only (.exe if Wine is installed, else .zip)
-#   ./build.sh --dev           run the app without building
-#   ./build.sh --no-notarize   unsigned macOS build, for local testing only
-#   ./build.sh --skip-tests    skip the rename-engine tests
-#   ./build.sh --setup         re-enter the Apple credentials, then exit
+#   ./scripts/build.sh                 everything: checks, tests, signed and notarized DMG
+#   ./scripts/build.sh --all           the same, plus the Windows build
+#   ./scripts/build.sh --win           Windows only (.exe if Wine is installed, else .zip)
+#   ./scripts/build.sh --dev           run the app without building
+#   ./scripts/build.sh --no-notarize   unsigned macOS build, for local testing only
+#   ./scripts/build.sh --skip-tests    skip the rename-engine tests
+#   ./scripts/build.sh --setup         re-enter the Apple credentials, then exit
 #
 # The first signed build asks for your Apple ID and an app-specific password, then
 # stores them in your keychain under the "renamo-notarization" profile. It never
@@ -18,7 +18,7 @@ set -euo pipefail
 
 # Resolve the script before moving: $0 may be relative to the caller's directory.
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-cd "$(dirname "$SELF")"
+cd "$(dirname "$SELF")/.."
 
 APP="renamo"
 PROFILE="${NOTARY_PROFILE:-renamo-notarization}"
@@ -37,7 +37,7 @@ for arg in ${1+"$@"}; do
     --skip-tests)  DO_TESTS=0 ;;
     --setup)       SETUP_ONLY=1 ;;
     -h|--help)     sed -n "2,16p" "$SELF"; exit 0 ;;
-    *) echo "  Unknown option: $arg   (try ./build.sh --help)"; exit 1 ;;
+    *) echo "  Unknown option: $arg   (try ./scripts/build.sh --help)"; exit 1 ;;
   esac
 done
 
@@ -80,14 +80,14 @@ find_identity() {
   [ -n "$line" ] || die \
 "no \"Developer ID Application\" certificate in your keychain.
        Create one on developer.apple.com > Certificates, download it and double-click it.
-       To build without signing in the meantime:  ./build.sh --no-notarize"
+       To build without signing in the meantime:  ./scripts/build.sh --no-notarize"
   IDENTITY=$(printf '%s' "$line" | sed -E 's/.*"(.*)".*/\1/')
   TEAM_ID=$(printf '%s' "$IDENTITY" | sed -E 's/.*\(([A-Z0-9]{10})\)$/\1/')
   [ ${#TEAM_ID} -eq 10 ] || die "could not read the team ID from the certificate \"$IDENTITY\"."
 }
 
 setup_profile() {
-  [ -t 0 ] || die "notarization is not configured and this shell is not interactive. Run ./build.sh --setup by hand."
+  [ -t 0 ] || die "notarization is not configured and this shell is not interactive. Run ./scripts/build.sh --setup by hand."
   printf '\n'
   info "First signed build: I need your Apple credentials once."
   info ""
@@ -122,7 +122,7 @@ ensure_profile() {
   if printf '%s' "$out" | grep -qiE "keychain|profile|credential|not found"; then
     setup_profile
     xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 \
-      || die "the credentials were stored but Apple still refuses them. Try ./build.sh --setup again."
+      || die "the credentials were stored but Apple still refuses them. Try ./scripts/build.sh --setup again."
   else
     die "notarytool could not reach Apple:
        $(printf '%s' "$out" | head -3)"
@@ -326,7 +326,7 @@ if [ "$DO_MAC" = "1" ]; then
   else
     info "NOT SHIPPABLE: unsigned build."
     info "  $DMG"
-    info "  first launch needs right-click > Open. Re-run ./build.sh for a real release."
+    info "  first launch needs right-click > Open. Re-run ./scripts/build.sh for a real release."
   fi
 fi
 if [ "$DO_WIN" = "1" ]; then

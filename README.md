@@ -54,18 +54,18 @@ so the very first time, **right-click the file and choose Open** instead of
 double-clicking it. To clear the flag on the whole folder in one go:
 `xattr -dr com.apple.quarantine <the renamo folder>`.
 
-They are thin wrappers around `build.sh`, which does everything on macOS — checks,
+They are thin wrappers around `scripts/build.sh`, which does everything on macOS — checks,
 tests, signing, notarization, stapling and verification:
 
 ```
-./build.sh                 signed and notarized macOS DMG, ready to ship
-./build.sh --all           the same, plus the Windows build
-./build.sh --win           Windows only
-./build.sh --dev           run the app without building
-./build.sh --no-notarize   unsigned macOS build, local testing only
-./build.sh --setup         re-enter the Apple credentials
+./scripts/build.sh                 signed and notarized macOS DMG, ready to ship
+./scripts/build.sh --all           the same, plus the Windows build
+./scripts/build.sh --win           Windows only
+./scripts/build.sh --dev           run the app without building
+./scripts/build.sh --no-notarize   unsigned macOS build, local testing only
+./scripts/build.sh --setup         re-enter the Apple credentials
 npm test                   rename-engine checks alone, no build
-bash build-linux.sh        Linux AppImage + .deb (on Linux)
+bash scripts/build-linux.sh        Linux AppImage + .deb (on Linux)
 ```
 
 Each build only replaces the files of the platform it builds, so a Windows build
@@ -78,7 +78,7 @@ The Linux packages are built **on a Linux machine** (x64). Building them from ma
 is not supported: the `.deb` produced there does not install.
 
 ```
-bash build-linux.sh
+bash scripts/build-linux.sh
 ```
 
 It checks Node (20.19 or newer, 22 LTS recommended; the script explains how to get it
@@ -101,7 +101,7 @@ On Linux the disk column lists the root, cards and USB drives (`/media`,
 the home folder. Most Linux volumes tell upper and lower case apart: renamo checks
 for that and never renames `clip.mov` onto an existing `Clip.mov`.
 
-`build-win.sh` still exists for a Windows-only build without touching build.sh.
+`scripts/build-win.sh` still exists for a Windows-only build without touching build.sh.
 The scripts are committed with the executable bit set; if your copy came from an
 archive that dropped it, restore it once with `chmod +x *.sh`.
 
@@ -113,17 +113,17 @@ developer" warning.
 
 You only need the **Developer ID Application** certificate in your login keychain
 (`security find-identity -v -p codesigning` should list it). On the first signed
-build, `build.sh` reads the team ID off that certificate, asks for your Apple ID and
+build, `scripts/build.sh` reads the team ID off that certificate, asks for your Apple ID and
 an [app-specific password](https://support.apple.com/en-us/102654) — not the Apple ID
 password — and stores them in the keychain as the `renamo-notarization` profile. It
 never asks again. Nothing secret is written into this folder: the script only ever
 refers to the profile by name. `NOTARY_PROFILE=<name>` points it at another profile,
-`./build.sh --setup` replaces the stored credentials.
+`./scripts/build.sh --setup` replaces the stored credentials.
 
 Under the hood, `scripts/notarize.js` runs as an electron-builder `afterSign` hook: it
 submits the signed `.app`, waits for Apple and staples the ticket into the bundle. The
 DMG is then built from that stapled app — and since electron-builder leaves the disk
-image itself unsigned, `build.sh` signs it with `codesign --timestamp` (Apple rejects
+image itself unsigned, `scripts/build.sh` signs it with `codesign --timestamp` (Apple rejects
 an unsigned or untimestamped image) before submitting and stapling it in turn. Both
 the app and the disk image therefore carry their own signature and ticket, and both
 verify offline. Each submission takes a few minutes on Apple's side. If Apple rejects
@@ -134,7 +134,7 @@ The Windows build is not signed: SmartScreen still shows a warning there.
 
 Both installers display the GNU GPL v3 license during installation.
 
-Building the Windows installer from macOS needs Wine; without it the script produces a portable .zip instead of the .exe. See the comments in build-win.sh.
+Building the Windows installer from macOS needs Wine; without it the script produces a portable .zip instead of the .exe. See the comments in scripts/build-win.sh.
 
 renamo is not sandboxed — it has to reach whatever volume you point it at. On first
 access macOS asks for permission to read your Desktop, Documents, Downloads and any
