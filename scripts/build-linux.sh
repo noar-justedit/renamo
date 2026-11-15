@@ -20,7 +20,7 @@ step() { printf '\n  %s\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 die()  { printf '\n  STOP: %s\n\n' "$*" >&2; exit 1; }
 
-[ "$(uname -s)" = "Linux" ] || die "this script builds on Linux only. On a Mac, use Build Mac.command or Build Windows.command."
+[ "$(uname -s)" = "Linux" ] || die "this script builds on Linux only. On a Mac, use scripts/build_mac.command or scripts/build_windows.command."
 [ "$(uname -m)" = "x86_64" ] || die "the packages are built for x64 (this machine is $(uname -m))."
 
 # ── Node ──────────────────────────────────────────────────────────────────────

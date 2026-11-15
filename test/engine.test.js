@@ -21,7 +21,7 @@ const src = html.slice(html.indexOf('\n', start) + 1, end);
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(src, ctx);
-const { buildName, applyCase, cleanStr, compileRegex, splitName, nameProblem } = ctx;
+const { buildName, applyCase, cleanStr, compileRegex, splitName, nameProblem, compileTemplate, parentFolders, fmtDate, indexInFolder, presetToText, presetFromText, withPreset, presetNamed, cleanPreset } = ctx;
 
 // Every rule off by default; each test switches on only what it needs.
 function S(over){
@@ -36,6 +36,7 @@ function S(over){
     extension: { on: false, mode: 'lower', newExt: '' },
     datetime: { on: false, source: 'now', fmt: 'YYYY-MM-DD', position: 'start' },
     numbering: { on: false, start: 1, increment: 1, padding: 3, sep: '_', position: 'end' },
+    template: { on: false, pattern: '', compiled: null },
   };
   for (const k of Object.keys(over || {})) base[k] = Object.assign({}, base[k], over[k]);
   return base;
@@ -165,4 +166,133 @@ t('the new name comes out in NFC', () => {
   assert.strictEqual(buildName(file('Cafe\u0301.mov'), 0, S({ add: { on: true, suffix: '_e\u0301' } })), 'Caf\u00e9_\u00e9.mov');
 });
 
+// ── TEMPLATE ───────────────────────────────────────────────────────────────
+const T = pattern => S({ template: { on: true, pattern, compiled: compileTemplate(pattern) } });
+const notes = () => ({ missing: [], waiting: false });
+const clip = (p, extra) => Object.assign({ name: p.split('/').pop(), path: p, isDir: false, birthtimeMs: 0, mtimeMs: 0 }, extra || {});
+const nov13 = new Date(2026, 10, 13, 9, 7, 5).getTime();
+
+t('date formats: YYYY YY MM DD HH hh mm ss, in one pass', () => {
+  const d = new Date(2026, 10, 13, 9, 7, 5);
+  assert.strictEqual(fmtDate(d, 'YYYYMMDD'), '20261113');
+  assert.strictEqual(fmtDate(d, 'YYMMDD'), '261113');
+  assert.strictEqual(fmtDate(d, 'YYYY-MM-DD_HHmmss'), '2026-11-13_090705');
+  assert.strictEqual(fmtDate(d, 'hh-mm-ss'), '09-07-05');
+});
+t('folders above a file, nearest first, on Mac and Windows paths', () => {
+  assert.deepStrictEqual([...parentFolders('/Volumes/NAS/20261113/CAM_A/CARTE_01/A001.mov')].slice(0, 3), ['CARTE_01', 'CAM_A', '20261113']);
+  assert.deepStrictEqual([...parentFolders('D:\\RUSHES\\CAM_B\\B002.mxf')], ['CAM_B', 'RUSHES', 'D:']);
+});
+t('the production format: native name, code, date, camera, card, resolution', () => {
+  const f = clip('/Volumes/NAS/20261113/CAM_A/CARTE_01/A001C003.mov', { _media: { width: 3840, height: 2160, fps: 25, codec: 'ProRes', shotMs: nov13 } });
+  assert.strictEqual(buildName(f, 0, T('{name}_PROD042_{shot:YYYYMMDD}_{folder2}_{folder1}_{resolution}')),
+    'A001C003_PROD042_20261113_CAM_A_CARTE_01_3840x2160.mov');
+});
+t('the date can sit anywhere, from the file dates too', () => {
+  const f = clip('/x/A001.mov', { birthtimeMs: nov13, mtimeMs: nov13 });
+  assert.strictEqual(buildName(f, 0, T('X_{created:YYMMDD}_{name}')), 'X_261113_A001.mov');
+  assert.strictEqual(buildName(f, 0, T('{modified}')), '20261113.mov');
+});
+t('{name} is the name after the text rules, {original} the name as it was', () => {
+  const s = T('{name}-{original}'); s.replace = { on: true, search: 'C003', replaceWith: '', matchCase: true };
+  assert.strictEqual(buildName(clip('/x/A001C003.mov'), 0, s), 'A001-A001C003.mov');
+});
+t('{n:3} numbers in the order of the list', () => {
+  assert.strictEqual(buildName(clip('/x/a.mov'), 4, T('SHOT_{n:3}')), 'SHOT_005.mov');
+  assert.strictEqual(buildName(clip('/x/a.mov'), 4, T('{n}')), '5.mov');
+});
+t('fps keeps its decimals only when there are some', () => {
+  assert.strictEqual(buildName(clip('/x/a.mov', { _media: { fps: 23.976023 } }), 0, T('{fps}')), '23.976.mov');
+  assert.strictEqual(buildName(clip('/x/a.mov', { _media: { fps: 25 } }), 0, T('{fps}')), '25.mov');
+});
+t('a value the file does not have is reported, never guessed', () => {
+  const n = notes();
+  buildName(clip('/x/a.wav', { _media: null }), 0, T('{name}_{resolution}_{created}'), n);
+  assert.deepStrictEqual([...n.missing], ['resolution', 'created']);
+  const n2 = notes();
+  buildName(clip('/a.mov'), 0, T('{folder2}'), n2);
+  assert.deepStrictEqual([...n2.missing], ['folder2']);
+  const n3 = notes();
+  buildName(clip('D:\\RUSHES\\B002.mxf'), 0, T('{folder2}'), n3);
+  assert.deepStrictEqual([...n3.missing], ['folder2'], 'a drive letter is not a folder name');
+});
+t('while the video information is being read, the name is marked as waiting', () => {
+  const n = notes();
+  buildName(clip('/x/a.mov'), 0, T('{resolution}'), n);
+  assert.strictEqual(n.waiting, true);
+  assert.strictEqual(compileTemplate('{resolution}').usesMedia, true);
+  assert.strictEqual(compileTemplate('{name}_{folder1}').usesMedia, false);
+});
+t('an unknown tag or an unclosed brace is an error (the window then renames nothing)', () => {
+  assert.ok(compileTemplate('{nmae}').error);
+  assert.ok(compileTemplate('{folder}').error, '{folder} needs its number');
+  assert.ok(compileTemplate('{name').error);
+  assert.ok(compileTemplate('{n:abc}').error);
+  const s = T('{nmae}_X');
+  assert.strictEqual(buildName(clip('/x/a.mov'), 0, s), 'a.mov');
+});
+t('CASE, ADD and CLEAN still apply after the template; the extension stays', () => {
+  const s = T('{folder1} {name}'); s.case = { on: true, mode: 'upper' }; s.clean = { on: true };
+  assert.strictEqual(buildName(clip('/x/Card 1/a001.mov'), 0, s), 'CARD_1_A001.mov');
+});
+t('with subfolders, numbering starts again in each folder', () => {
+  const items = ['/d/CARTE_01/a', '/d/CARTE_01/b', '/d/CARTE_01/c', '/d/CARTE_02/a', '/d/CARTE_02/b'].map(p => ({ dir: p.slice(0, p.lastIndexOf('/')) }));
+  assert.deepStrictEqual([...indexInFolder(items)], [0, 1, 2, 0, 1]);
+  const one = ['a', 'b', 'c'].map(() => ({ dir: '/d' }));
+  assert.deepStrictEqual([...indexInFolder(one)], [0, 1, 2], 'one folder: as before');
+});
+t('a template that writes a folder separator cannot move the file', () => {
+  assert.strictEqual(buildName(clip('/x/CAM/a.mov'), 0, T('{folder1}/{name}')), 'CAMa.mov');
+});
+
+// ── template presets ───────────────────────────────────────────────────────
+t('a preset travels as one line of text and comes back the same', () => {
+  const p = { name: 'PROD042 — "Poine"', template: '{name}_PROD042_{shot:YYYYMMDD}_{folder2}_{folder1}_{resolution}' };
+  const text = presetToText(p);
+  assert.ok(/^renamo-preset \{/.test(text) && !/\n/.test(text));
+  assert.deepStrictEqual({ ...presetFromText(text) }, p);
+});
+t('a pasted preset survives the line breaks and spaces a mail adds', () => {
+  const text = presetToText({ name: 'A', template: '{name}_X' });
+  const mailed = '  ' + text.slice(0, 20) + '\r\n' + text.slice(20) + '\n ';
+  assert.deepStrictEqual({ ...presetFromText(mailed) }, { name: 'A', template: '{name}_X' });
+});
+t('a mail that cuts the line at a space, or indents it, changes nothing', () => {
+  const p = { name: 'PROD 042 Poine', template: '{name}_PROD 042  x' };
+  const text = presetToText(p);
+  assert.ok(!/ /.test(text.slice('renamo-preset '.length)), 'the shared line still holds spaces: ' + text);
+  const cut = text.split('').map((c, i) => (i % 7 === 6 ? c + '\r\n    ' : c)).join('');
+  assert.deepStrictEqual({ ...presetFromText(cut) }, p);
+});
+t('a preset typed by hand keeps the spaces inside its line', () => {
+  assert.deepStrictEqual({ ...presetFromText('renamo-preset {"name":"Mariage Dupont","template":"{name} x"}') }, { name: 'Mariage Dupont', template: '{name} x' });
+});
+t('names and templates are kept in NFC and within their limits, the same way on save and on paste', () => {
+  const long = 'x'.repeat(700);
+  const viaSave = cleanPreset('  Cafe\u0301 ' + long, '{name}' + long);
+  const viaPaste = presetFromText(presetToText({ name: '  Cafe\u0301 ' + long, template: '{name}' + long }));
+  assert.deepStrictEqual({ ...viaPaste }, { ...viaSave });
+  assert.ok(viaSave.name.startsWith('Caf\u00e9') && viaSave.name.length === 60 && viaSave.template.length === 500);
+});
+t('one preset per name, whatever the case or the accent form', () => {
+  const l = withPreset(withPreset([], { name: 'Caf\u00e9', template: '1' }), { name: 'CAFE\u0301', template: '2' });
+  assert.strictEqual(l.length, 1);
+  assert.strictEqual(presetNamed(l, 'café').template, '2');
+  assert.strictEqual(presetNamed(l, 'other'), null);
+});
+t('invisible and right-to-left characters are refused in a new name', () => {
+  for (const c of ['\u200B', '\u200E', '\u202E', '\u2066', '\uFEFF']) assert.ok(nameProblem('A001_' + c + 'x.mov'), JSON.stringify(c));
+  assert.strictEqual(nameProblem('A001_Café_日本.mov'), null);
+});
+t('anything else is not a preset', () => {
+  for (const bad of ['', 'hello', '{name}_X', 'renamo-preset {oops', 'renamo-preset {"name":"","template":"x"}', 'renamo-preset {"name":"A"}', 'renamo-preset 42'])
+    assert.strictEqual(presetFromText(bad), null, bad);
+});
+t('saving under an existing name replaces it (case ignored); the list stays sorted', () => {
+  let l = withPreset([], { name: 'b', template: '1' });
+  l = withPreset(l, { name: 'A', template: '2' });
+  l = withPreset(l, { name: 'B', template: '3' });
+  assert.deepStrictEqual(l.map(p => p.name + '=' + p.template), ['A=2', 'B=3']);
+  assert.deepStrictEqual(withPreset([{ name: 'P10', template: 'x' }], { name: 'P9', template: 'y' }).map(p => p.name), ['P9', 'P10']);
+});
 console.log(passed + ' checks passed' + (process.exitCode ? ' — with failures above' : ''));

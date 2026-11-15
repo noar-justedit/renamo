@@ -2,14 +2,22 @@
 
 Batch rename files and folders with a live preview. Build a new name from independent rules, then see the result before you commit.
 
-macOS, Windows and Linux. Built with Electron. No dependencies, no sign-up.
+macOS 13 or later, Windows 10/11 and Linux. Built with Electron. No sign-up.
 
 ![renamo screenshot](screenshots/renamo.png)
 
 ## Features
 
 - Browse your disks, select files or folders, or drop them in from Finder / Explorer
-- Independent rules: insert, add, remove, replace, regex, case, extension, date/time, numbering
+- Independent rules: insert, add, remove, replace, regex, template, case, extension, date/time, numbering
+- TEMPLATE: write the whole name with tags, in any order (see below)
+- Subfolders: list the files of every folder below the one you open (`DAY/CAMERA/CARD/…`) and rename
+  them in one go; each file stays in its own folder
+- Template presets: save a template under a name, load it from a list, and share it as one line
+  of text (copy, send it, paste it in another renamo)
+- The rules are kept as you left them for the next launch (Subfolders excepted)
+- Video information read from the clips (resolution, frame rate, codec, recording date) with MediaInfo,
+  read only
 - REGEX: JavaScript patterns with `$1`, `$2` capture groups, optional case-insensitive matching
 - CASE: lowercase, UPPERCASE, Title Case or Sentence case on the name, extension untouched
 - CLEAN: strip accents and special characters, replace spaces with underscores
@@ -31,22 +39,45 @@ macOS, Windows and Linux. Built with Electron. No dependencies, no sign-up.
 
 Rules always apply in the same order, on the name without its extension:
 
-`INSERT → REMOVE → REPLACE → REGEX → CASE → ADD → DATE/TIME → NUMBERING → CLEAN`,
+`INSERT → REMOVE → REPLACE → REGEX → TEMPLATE → CASE → ADD → DATE/TIME → NUMBERING → CLEAN`,
 then the EXTENSION rule on the extension itself. CASE runs before ADD, so a prefix
 or suffix you type is kept exactly as typed.
+
+### Template tags
+
+Everything outside braces is kept as typed. A file that has no value for a tag is
+flagged in the preview and left alone: renamo never guesses. A template with a typo
+(an unknown tag, a brace left open) renames nothing until it is fixed.
+
+| Tag | Value |
+|---|---|
+| `{name}` | the name so far (after INSERT, REMOVE, REPLACE, REGEX) |
+| `{original}` | the name as it was |
+| `{folder1}`, `{folder2}`… | the folder the file is in, the one above… |
+| `{created:FORMAT}`, `{modified:FORMAT}`, `{today:FORMAT}` | a date of the file, or today |
+| `{shot:FORMAT}` | the recording date written in the clip, as written (no time zone conversion) |
+| `{resolution}`, `{width}`, `{height}` | `3840x2160`, `3840`, `2160` |
+| `{fps}`, `{codec}` | `25`, `23.976`; `ProRes`, `AVC`, `HEVC`… |
+| `{n:3}` | a number in list order, here on 3 digits (`001`); with Subfolders it starts again in each folder |
+
+Date formats: `YYYY` `YY` `MM` `DD` `HH` `mm` `ss` (upper case `MM` is the month, lower
+case `mm` the minutes), `YYYYMMDD` by default. Example:
+`{name}_PROD042_{shot:YYYYMMDD}_{folder2}_{folder1}_{resolution}` turns
+`20261113/CAM_A/CARTE_01/A001C003.mov` into
+`A001C003_PROD042_20261113_CAM_A_CARTE_01_3840x2160.mov`.
 
 ## Build from source
 
 Requires Node.js. From the project root:
 
-Three double-clickable files sit at the root of the project, for building without
+Three double-clickable files sit in the `scripts` folder, for building without
 opening a terminal:
 
 | Double-click | What it does |
 |---|---|
-| `Build Mac.command` | signed and notarized macOS DMG |
-| `Build Windows.command` | Windows installer and portable zip |
-| `Build Mac + Windows.command` | both, for release day |
+| `build_mac.command` | signed and notarized macOS DMG |
+| `build_windows.command` | Windows installer and portable zip |
+| `build_mac_windows.command` | both, for release day |
 
 Each one opens Terminal, runs the build and keeps the window open at the end so the
 result stays readable. macOS quarantines files that came out of a downloaded archive,
@@ -154,6 +185,7 @@ On launch, renamo checks its own version.json in this repository and shows a not
 ## Third-party components
 
 - Electron (MIT)
+- mediainfo.js and MediaInfoLib (BSD-2-Clause), to read video information
 - Tabler Icons (MIT)
 - Poppins typeface, used for the wordmark (SIL Open Font License 1.1, see src/fonts/Poppins-OFL.txt)
 

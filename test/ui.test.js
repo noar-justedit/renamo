@@ -162,12 +162,16 @@ t('the right-click menu is made of menu items, floats on --raise, and closes wit
   assert.ok(!/#ctx[^{]*\{[^}]*border:\s*[^n}]/.test(block), 'the menu has a border');
 });
 
-t('the name window keeps its buttons only, and renames through the engine', () => {
+t('the small windows keep their buttons only; Edit name renames through the engine', () => {
+  // Behaviour is covered by docs/notes/harnais (noms- and presets-scenarios.js);
+  // this guards the two rules that a later edit could quietly drop.
+  const d = script.slice(script.indexOf('function openDialog'), script.indexOf("document.getElementById('tp-preset').addEventListener('change'"));
+  assert.ok(d.length > 500, 'openDialog not found');
+  assert.ok(!/Escape/.test(d), 'the small windows close on Escape');
+  assert.ok(/\.inert\s*=\s*true/.test(d), 'the app behind a small window is no longer made inert');
+  assert.ok(!/ov\.onclick/.test(d), 'the small windows close on a click on the veil');
   const w = script.slice(script.indexOf('function showEditName'), script.indexOf('// ---- after a batch'));
-  assert.ok(w.length > 500, 'showEditName not found');
-  assert.ok(!/Escape/.test(w), 'the name window closes on Escape');
-  assert.ok(!/ov\.onclick/.test(w), 'the name window closes on a click on the veil');
-  assert.ok(/callEngine\(api\.renameBatch/.test(w), 'the name is not renamed through the engine');
+  assert.ok(/runEngine\(/.test(w), 'the name is not renamed through the engine');
   assert.ok(/nameProblem\(/.test(w), 'the preview checks are not applied');
 });
 

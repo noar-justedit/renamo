@@ -138,6 +138,7 @@ body.dropping #main{box-shadow:inset 0 0 0 2px var(--accent);}
 .mcard{border-radius:7px;padding:9px 10px;border:0.5px solid var(--bd);background:var(--card-off);}
 .mcard.on{background:var(--card-on);border-color:var(--accent);}
 .clean-bar{grid-column:span 6;}
+.rcol .clean-bar{grid-column:auto;}
 .clean-bar .mhead{margin-bottom:0;}
 .clean-desc{font-size:12px;color:var(--dim);margin-left:2px;}
 .mcard.on .clean-desc{color:#a39ad0;}
@@ -291,6 +292,8 @@ body{background:var(--page);color:var(--text);font-family:var(--font);gap:12px;}
 #crumbs .cr:hover{color:var(--text);text-decoration:none;}
 #crumbs .cr.last{color:var(--text);}
 #crumbs .sep{color:var(--text4);}
+#crumbs button.cr{background:none;border:none;padding:1px 3px;margin:0 -3px;font:inherit;border-radius:var(--r-badge);flex:none;}
+#crumbs button.cr:focus-visible{outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);color:var(--text);}
 .filterwrap{background:var(--ins);border:none;border-radius:var(--r-field);padding:0 8px;height:30px;gap:7px;}
 .filterwrap:focus-within{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
 .filterwrap.on{border:none;}
@@ -523,6 +526,8 @@ body.dropping #center{box-shadow:inset 0 0 0 2px var(--blue);}
 
 /* Breadcrumb: the current folder always shows; a fade says the start is cut. */
 #crumbs.ovf{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 32px);mask-image:linear-gradient(90deg,transparent 0,#000 32px);}
+/* Moving through the path with Tab: no fade, the focused crumb must read in full. */
+#crumbs.ovf:focus-within{-webkit-mask-image:none;mask-image:none;}
 
 /* Disk tree: long names end with an ellipsis, no sideways scrolling. */
 #sidebar{overflow-x:hidden;}
@@ -553,8 +558,31 @@ button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);bo
 #edit-ov{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.7);-webkit-app-region:no-drag;}
 #edit-ov .fld{margin:0 0 8px;}
+#edit-ov .edit-note{font-size:12px;line-height:1.45;color:var(--text3);white-space:pre-line;word-break:break-word;margin-bottom:6px;}
 #edit-ov .edit-err{min-height:32px;font-size:12px;line-height:1.4;color:var(--red);margin-bottom:8px;}
 #edit-ov .upd-btn[disabled]{color:var(--text4);cursor:default;}
+/* Template and Clean share the right half of the last row. */
+.rcol{grid-column:span 6;display:flex;flex-direction:column;gap:12px;min-width:0;}
+.tp-toks{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
+.tp-presets{display:flex;align-items:center;gap:3px;margin-left:auto;}
+.pbtn{height:24px;padding:0 8px;font-family:var(--sans);font-size:11.5px;color:var(--text3);background:transparent;border:none;border-radius:var(--r-field);cursor:pointer;}
+.pbtn:hover{background:var(--raise);color:var(--text);}
+.pbtn:focus-visible{outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+.pbtn[disabled]{color:var(--text4);cursor:default;background:transparent;}
+#tp-preset{height:24px;max-width:150px;font-family:var(--sans);font-size:11.5px;color:var(--text2);background:var(--ins);border:none;border-radius:var(--r-field);padding:0 8px;outline:none;cursor:pointer;margin-right:4px;}
+#tp-preset:focus-visible{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+#edit-ov textarea.fld{height:84px;resize:none;font-family:var(--mono);font-size:11.5px;line-height:1.4;}
+.tok{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--ins);border:none;border-radius:var(--r-badge);padding:2px 7px;cursor:pointer;}
+.tok:hover{color:var(--text);}
+.tok:focus-visible{outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+#tp-pattern{font-family:var(--mono);}
+/* With subfolders, the folder of the file is shown before its name, dimmed. */
+.row .cur .rel{color:var(--text4);flex:0 1 auto;min-width:0;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:-7px;}
+.row .cur .rel:empty{display:none;}
+/* A name still waiting for its video information. */
+.row.wait .nw{color:var(--text3);}
+#sub-toggle{margin:0;background:none;border:none;padding:0 4px;font-family:var(--sans);font-size:12px;color:var(--text3);white-space:nowrap;}
+#sub-toggle.on{color:var(--text);}
 /* ═══ end of the charter block ═══ */
 </style>
 </head>
@@ -574,9 +602,10 @@ button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);bo
 </div>
 
 <div id="pathbar">
-  <button type="button" class="up" id="btn-up" title="Up one level" aria-label="Up one level"><i class="ti ti-arrow-up"></i></button>
-  <span id="crumbs"></span>
+  <button type="button" class="up" id="btn-up" title="Up one level (Cmd/Ctrl+Up)" aria-label="Up one level"><i class="ti ti-arrow-up"></i></button>
+  <nav id="crumbs" aria-label="Path"></nav>
   <div class="pbtools">
+    <button type="button" class="chk-inline" id="sub-toggle" role="checkbox" aria-checked="false" title="List the files of every subfolder too"><span class="cbox"></span>Subfolders</button>
     <span class="filterwrap" id="filterwrap">
       <i class="ti ti-search"></i>
       <input id="flt" type="text" placeholder="Filter" spellcheck="false" title="Filter the list (Cmd/Ctrl+F, Esc to clear)" />
@@ -766,6 +795,37 @@ button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);bo
       </div>
     </div>
   </div>
+  <div class="rcol">
+  <!-- TEMPLATE -->
+  <div class="mcard" id="card-template">
+    <div class="mhead"><button type="button" class="sw" data-sw="template" role="switch" aria-checked="false" aria-label="Template rule"><span class="kn"></span></button><span class="mtitle">TEMPLATE</span>
+      <span class="tp-presets">
+        <select id="tp-preset" aria-label="Template presets" title="Load a saved template"></select>
+        <button type="button" class="pbtn" id="tp-save" title="Save this template as a preset">Save</button>
+        <button type="button" class="pbtn" id="tp-copy" title="Copy the preset as text, to share it">Copy</button>
+        <button type="button" class="pbtn" id="tp-paste" title="Add a preset someone shared with you">Paste</button>
+        <button type="button" class="pbtn" id="tp-remove" title="Remove this preset from the list">Remove</button>
+      </span>
+    </div>
+    <div class="frow">
+      <div class="fcol"><input class="fld" id="tp-pattern" spellcheck="false" autocomplete="off" aria-label="Template"
+           placeholder="{name}_PROD042_{shot:YYYYMMDD}_{folder2}_{folder1}_{resolution}"
+           title="The new name, written with tags in braces. Dates: YYYY YY MM DD HH mm ss, e.g. {created:YYMMDD}. {folder1} is the folder the file is in, {folder2} the one above." /></div>
+    </div>
+    <div class="tp-toks" id="tp-toks" aria-label="Insert a tag">
+        <button type="button" class="tok" data-tok="{name}">name</button>
+        <button type="button" class="tok" data-tok="{folder1}">folder1</button>
+        <button type="button" class="tok" data-tok="{folder2}">folder2</button>
+        <button type="button" class="tok" data-tok="{folder3}">folder3</button>
+        <button type="button" class="tok" data-tok="{created:YYYYMMDD}">created</button>
+        <button type="button" class="tok" data-tok="{shot:YYYYMMDD}">shot</button>
+        <button type="button" class="tok" data-tok="{resolution}">resolution</button>
+        <button type="button" class="tok" data-tok="{fps}">fps</button>
+        <button type="button" class="tok" data-tok="{codec}">codec</button>
+        <button type="button" class="tok" data-tok="{n:3}">number</button>
+    </div>
+    <div class="hint err" id="tp-hint" style="display:none;"></div>
+  </div>
   <!-- CLEAN -->
   <div class="mcard clean-bar" id="card-clean">
     <div class="mhead">
@@ -774,13 +834,14 @@ button.set-row{display:flex;align-items:center;gap:10px;background:var(--ins);bo
       <span class="clean-desc">Strip accents and special characters, replace spaces with _</span>
     </div>
   </div>
+  </div>
 </div>
 
 <div id="footer">
   <div class="foot-left">
     <span id="status">No selection</span>
     <div class="foot-meta">
-      <span class="fm-ver" id="fm-ver">v1.8.0</span>
+      <span class="fm-ver" id="fm-ver">v1.9.0</span>
       <span class="fm-sep">·</span>
       <button type="button" class="fm-link" id="lnk-github">GitHub</button>
       <span class="fm-sep">·</span>
@@ -814,11 +875,15 @@ let sortKey = 'name';
 let sortDir = 1;          // 1 = ascending, -1 = descending
 let filterText = '';
 let openToken = 0;        // the last folder asked for wins, even if an older answer arrives later
+let withSubfolders = false; // list the files of every subfolder too
+let otherNames = new Set(); // dir + NUL + loose name of what the list does not show (subfolders)
+let shownLeftovers = [];    // leftovers of an interrupted rename, as last shown
 
 const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:'base'});
-const looseName = s => String(s).normalize('NFC').toLowerCase();
 
 // ---- rename engine ---- ENGINE-START (kept free of DOM access: see test/engine.test.js)
+// Two names compared the way macOS and most NAS compare them: case and accent form ignored.
+const looseName = s => String(s).normalize('NFC').toLowerCase();
 function splitName(name, isDir){
   if(isDir) return {base:name, ext:''};
   const i = name.lastIndexOf('.');
@@ -826,11 +891,13 @@ function splitName(name, isDir){
   return {base:name.slice(0,i), ext:name.slice(i+1)};
 }
 function pad(n,w){let s=String(n);while(s.length<w)s='0'+s;return s;}
+// A date written with a format: YYYY or YY year, MM month, DD day, HH (or hh)
+// hours, mm minutes, ss seconds. Upper case MM is the month, lower case mm the
+// minutes. Anything else is kept as typed.
 function fmtDate(d,fmt){
-  const Y=d.getFullYear(), M=pad(d.getMonth()+1,2), D=pad(d.getDate(),2),
-        h=pad(d.getHours(),2), m=pad(d.getMinutes(),2), s=pad(d.getSeconds(),2);
-  return fmt.split('YYYY').join(Y).split('MM').join(M).split('DD').join(D)
-            .split('hh').join(h).split('mm').join(m).split('ss').join(s);
+  const v={ YYYY:String(d.getFullYear()), YY:pad(d.getFullYear()%100,2), MM:pad(d.getMonth()+1,2), DD:pad(d.getDate(),2),
+            HH:pad(d.getHours(),2), hh:pad(d.getHours(),2), mm:pad(d.getMinutes(),2), ss:pad(d.getSeconds(),2) };
+  return fmt.replace(/YYYY|YY|MM|DD|HH|hh|mm|ss/g, t=>v[t]);
 }
 function cleanStr(s){
   s = s.normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -856,7 +923,120 @@ function compileRegex(pattern, ignoreCase){
   try { return new RegExp(pattern, ignoreCase ? 'gi' : 'g'); }
   catch(e){ return null; }
 }
-function buildName(item, index, S){
+// ---- TEMPLATE: the name written as text with tags in braces ----
+// {name} the name so far, {original} the name as it was, {folder1} the folder
+// the file is in, {folder2} the one above... {created:FORMAT}, {modified:FORMAT},
+// {today:FORMAT}, {shot:FORMAT} (recording date read in the clip), {n:DIGITS},
+// {resolution} (3840x2160), {width}, {height}, {fps}, {codec}.
+const TPL_DATE_KEYS = ['created','modified','today','shot'];
+const TPL_MEDIA_KEYS = ['shot','resolution','width','height','fps','codec'];
+const TPL_KEY_RE = /^(name|original|folder[1-9]|created|modified|today|shot|n|resolution|width|height|fps|codec)$/;
+// -> { parts:[text | {key,arg}], usesMedia, error }
+function compileTemplate(pattern){
+  const parts=[]; let usesMedia=false, error=null;
+  const re=/\{([^{}]*)\}/g; let last=0, m;
+  while((m=re.exec(pattern))){
+    if(m.index>last) parts.push(pattern.slice(last, m.index));
+    const inner=m[1], colon=inner.indexOf(':');
+    const key=(colon<0 ? inner : inner.slice(0,colon)).trim(), arg=colon<0 ? '' : inner.slice(colon+1);
+    if(!TPL_KEY_RE.test(key)){ if(!error) error='Unknown tag {'+inner+'}'; }
+    else if(key==='n' && arg && !/^\d{1,2}$/.test(arg)){ if(!error) error='{n:…} takes a number of digits, like {n:3}'; }
+    else { parts.push({key, arg}); if(TPL_MEDIA_KEYS.includes(key)) usesMedia=true; }
+    last=re.lastIndex;
+  }
+  if(last<pattern.length) parts.push(pattern.slice(last));
+  if(!error && /[{}]/.test(parts.filter(x=>typeof x==='string').join(''))) error='A { or } is not closed';
+  return { parts, usesMedia, error };
+}
+// The folders above a path, nearest first: ".../DAY1/CAM_A/A001.mov" -> ['CAM_A','DAY1',...].
+function parentFolders(p){
+  const bits=String(p).split(/[\\/]+/).filter(Boolean);
+  bits.pop();
+  return bits.reverse();
+}
+const fmtFps = f => String(Number(f.toFixed(3)));
+// One tag's value for this file, or null when the file does not have it.
+// notes.waiting is set while the video information is still being read.
+function templateValue(part, item, index, base, notes){
+  const k=part.key, media=item._media;
+  if(TPL_MEDIA_KEYS.includes(k) && media===undefined){ notes.waiting=true; return '…'; }
+  if(k==='name') return base;
+  if(k==='original') return splitName(item.name, item.isDir).base;
+  if(k.indexOf('folder')===0){ const f=parentFolders(item.path)[parseInt(k.slice(6),10)-1]; return f && !/^[A-Za-z]:$/.test(f) ? f : null; }
+  if(k==='n') return pad(index+1, Math.max(1, parseInt(part.arg||'1',10)));
+  if(TPL_DATE_KEYS.includes(k)){
+    const ms = k==='created' ? item.birthtimeMs : k==='modified' ? item.mtimeMs : k==='today' ? Date.now() : (media && media.shotMs);
+    return ms ? fmtDate(new Date(ms), part.arg || 'YYYYMMDD') : null;
+  }
+  if(!media) return null;
+  if(k==='resolution') return media.width && media.height ? media.width+'x'+media.height : null;
+  if(k==='width' || k==='height') return media[k] ? String(media[k]) : null;
+  if(k==='fps') return media.fps ? fmtFps(media.fps) : null;
+  if(k==='codec') return media.codec || null;
+  return null;
+}
+// notes.missing collects the tags this file has no value for.
+function applyTemplate(tpl, item, index, base, notes){
+  let out='';
+  for(const part of tpl.parts){
+    if(typeof part==='string'){ out+=part; continue; }
+    const v=templateValue(part, item, index, base, notes);
+    if(v===null){ notes.missing.push(part.key); continue; }
+    out+=v;
+  }
+  return out.normalize('NFC');
+}
+
+// ---- template presets: a name and a template, kept in renamo, shared as text ----
+// The text form is one line that can travel by mail or chat:
+//   renamo-preset {"name":"PROD042\u0020Poine","template":"{name}_PROD042_…"}
+// Its spaces are written \u0020, so the line has none: a mail may cut it and
+// indent the next line anywhere; on reading, every line break is dropped with
+// the spaces around it, and nothing changes. A space typed inside a line by
+// hand is kept.
+const PRESET_PREFIX = 'renamo-preset';
+const PRESET_NAME_MAX = 60;
+const PRESET_TEMPLATE_MAX = 500;
+// A preset as kept: name trimmed, both in NFC, both within their limits.
+function cleanPreset(name, template){
+  return { name: String(name).normalize('NFC').trim().slice(0, PRESET_NAME_MAX),
+           template: String(template).normalize('NFC').slice(0, PRESET_TEMPLATE_MAX) };
+}
+function presetToText(p){
+  return PRESET_PREFIX + ' ' + JSON.stringify({ name:p.name, template:p.template }).replace(/ /g, '\\u0020');
+}
+// -> { name, template } or null.
+function presetFromText(text){
+  const t = String(text||'').replace(/[ \t]*[\r\n]+[ \t]*/g, '').trim();
+  if(t.indexOf(PRESET_PREFIX)!==0) return null;
+  let o; try { o = JSON.parse(t.slice(PRESET_PREFIX.length)); } catch(e){ return null; }
+  if(!o || typeof o.name!=='string' || typeof o.template!=='string') return null;
+  const p = cleanPreset(o.name, o.template);
+  return p.name && p.template ? p : null;
+}
+// The preset of the list with that name (case and accents compared loosely), or null.
+function presetNamed(list, name){
+  const k = looseName(String(name).trim());
+  return list.find(x=>looseName(x.name)===k) || null;
+}
+// The list with `p` added, or replacing the preset of the same name; sorted by name.
+function withPreset(list, p){
+  const q = cleanPreset(p.name, p.template);
+  const out = list.filter(x=>looseName(x.name)!==looseName(q.name)).concat([q]);
+  return out.sort((a,b)=>a.name.localeCompare(b.name, undefined, { numeric:true, sensitivity:'base' }));
+}
+
+// The number each item gets from {n} and NUMBERING: its rank among the items
+// of its own folder (with Subfolders, each card starts again at 1).
+function indexInFolder(items){
+  const seen=new Map();
+  return items.map(e=>{ const k=seen.get(e.dir)||0; seen.set(e.dir,k+1); return k; });
+}
+
+// The new name of one item. `notes` (optional) receives what the template
+// could not fill: notes.missing (tags) and notes.waiting (video info pending).
+function buildName(item, index, S, notes){
+  notes = notes || { missing:[], waiting:false };
   let {base, ext} = splitName(item.name, item.isDir);
   base = base.normalize('NFC');
   const ins=S.insert;
@@ -888,6 +1068,8 @@ function buildName(item, index, S){
     const re = rx.compiled !== undefined ? rx.compiled : compileRegex(rx.pattern, rx.ignoreCase);
     if(re){ re.lastIndex=0; try{ base = base.replace(re, rx.replaceWith||''); }catch(e){} }
   }
+  const tp=S.template;
+  if(tp && tp.on && tp.compiled && !tp.compiled.error) base = applyTemplate(tp.compiled, item, index, base, notes);
   const cs=S.case;
   if(cs.on) base = applyCase(base, cs.mode);
   const a=S.add;
@@ -927,6 +1109,9 @@ function nameProblem(nn){
   if(nn==='' || nn==='.' || nn==='..') return 'The new name would be empty';
   if(nn.charAt(0)==='.') return 'Nothing left before the extension: the file would be hidden';
   if(/[<>:"|?*\u0000-\u001f]/.test(nn)) return 'Not allowed on Windows: < > : " | ? *';
+  // Invisible characters, and those that turn the text right to left: a name
+  // could then show "A001_vom.jpg" for a file that is a .mov.
+  if(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/.test(nn)) return 'The name holds an invisible or right-to-left character';
   if(/[ .]$/.test(nn)) return 'Not allowed on Windows: a name cannot end with a space or a dot';
   if(WIN_RESERVED.test(nn)) return 'This name is reserved by Windows';
   if(utf8Length(nn)>255) return 'The new name is too long (255 bytes at most)';
@@ -940,7 +1125,9 @@ function gatherSettings(){
   const segVal = id => {const a=document.querySelector('#'+id+' .active');return a?a.dataset.v:'end';};
   const rxPattern = document.getElementById('rx-pattern').value;
   const rxIcase = document.getElementById('rx-icase').classList.contains('on');
+  const tplPattern = document.getElementById('tp-pattern').value;
   return {
+    template:{on:onOf('template'), pattern:tplPattern, compiled: tplPattern ? compileTemplate(tplPattern) : null},
     clean:{on:onOf('clean')},
     regex:{on:onOf('regex'), pattern:rxPattern, replaceWith:document.getElementById('rx-replace').value,
            ignoreCase:rxIcase, compiled:compileRegex(rxPattern, rxIcase)},
@@ -967,6 +1154,43 @@ function showRegexState(S){
   hint.textContent = bad ? 'Invalid regular expression — this rule is ignored.' : '';
 }
 
+function showTemplateState(S){
+  const fld=document.getElementById('tp-pattern'), hint=document.getElementById('tp-hint');
+  const err = S.template.on && S.template.compiled && S.template.compiled.error;
+  fld.classList.toggle('bad', !!err);
+  hint.style.display = err ? 'block' : 'none';
+  hint.textContent = err ? err+' — nothing is renamed until it is fixed.' : '';
+}
+
+// Video information for the template, asked for in the background, 20 files
+// at a time. Each entry gets e._media: undefined while unknown, null when the
+// file has none (e._mediaErr then says why when the reading failed). Opening
+// another folder stops the loop and drops the files not read yet.
+const mediaAsked = new Set();
+async function requestMedia(list){
+  const todo = list.filter(e=>e._media===undefined && !e.isDir && !mediaAsked.has(e.path));
+  if(!todo.length) return;
+  const tok = openToken;
+  todo.forEach(e=>mediaAsked.add(e.path));
+  for(let i=0;i<todo.length;i+=20){
+    if(tok!==openToken) return;
+    const chunk = todo.slice(i,i+20);
+    let res;
+    try { res = await api.mediaInfo(chunk.map(e=>e.path)); }
+    catch(err){ res = chunk.map(e=>({ path:e.path, error:String(err && err.message || err) })); }
+    if(tok!==openToken) return;
+    const byPath = new Map((res||[]).map(r=>[r.path,r]));
+    for(const e of chunk){
+      mediaAsked.delete(e.path);
+      const r = byPath.get(e.path);
+      if(!r || r.cancelled) continue;                   // asked again on the next rebuild
+      e._media = r.info || null;
+      e._mediaErr = r.error || null;
+    }
+    scheduleRecompute();
+  }
+}
+
 // Typing in a rule field waits for a short pause before the preview is
 // rebuilt; a click rebuilds it at once. Anything that acts on the names
 // (Rename) flushes a pending rebuild first.
@@ -978,29 +1202,45 @@ function recompute(){
   if(recomputeT){ clearTimeout(recomputeT); recomputeT=null; }
   const S = gatherSettings();
   showRegexState(S);
+  showTemplateState(S);
   const selEntries = entries.filter(e => selected.has(e.path));
   // The collision check runs against every file of the folder that keeps its
   // name - rows hidden by the filter included, ticked or not.
   const renaming = new Set(selEntries.map(e=>e.path));
-  const siblingNames = new Set();
-  for(const e of allEntries) if(!renaming.has(e.path)) siblingNames.add(e._k);
+  // Names are compared folder by folder: with subfolders, two cards may both
+  // hold an A001.mov.
+  const siblingNames = new Set(otherNames);
+  for(const e of allEntries) if(!renaming.has(e.path)) siblingNames.add(e.dir+'\u0000'+e._k);
   const targetCount = new Map();
   const newNames = [];
+  const nth = indexInFolder(selEntries);
   selEntries.forEach((e,i)=>{
-    const nn = buildName(e, i, S);
-    const k = looseName(nn);
-    newNames.push([nn,k]);
+    const notes = { missing:[], waiting:false };
+    const nn = buildName(e, nth[i], S, notes);
+    const k = e.dir+'\u0000'+looseName(nn);
+    newNames.push([nn,k,notes]);
     targetCount.set(k, (targetCount.get(k)||0)+1);
   });
   const noBirth = S.datetime.on && S.datetime.source==='created';
+  // A template with a typo stops everything rather than renaming with the
+  // other rules only.
+  const tplError = S.template.on && S.template.compiled && S.template.compiled.error;
   let missingDates = 0;
   computed = [];
   selEntries.forEach((e,i)=>{
-    const [nn,k] = newNames[i];
+    const [nn,k,notes] = newNames[i];
     let status='ok', reason='';
     const problem = nameProblem(nn);
-    if(noBirth && !e.birthtimeMs){ status='conflict'; reason='This volume does not record a creation date for this file. Use Date modified.'; missingDates++; }
-    else if(k===e._k && e.name.normalize('NFC')===nn){
+    if(tplError){ status='conflict'; reason='The template has an error: '+tplError; }
+    else if(notes.waiting){ status='wait'; reason='Reading the video information…'; }
+    else if(notes.missing.length){
+      status='conflict';
+      const media = notes.missing.some(t=>TPL_MEDIA_KEYS.includes(t));
+      reason='This file has no '+[...new Set(notes.missing)].map(t=>'{'+t+'}').join(', ')
+        + (media ? (e._mediaErr ? ' (could not read it: '+e._mediaErr+'; Refresh to try again)' : ' (not a video, or a format MediaInfo cannot read)') : '');
+    }
+    else if(noBirth && !e.birthtimeMs){ status='conflict'; reason='This volume does not record a creation date for this file. Use Date modified.'; missingDates++; }
+    else if(k===e.dir+'\u0000'+e._k && e.name.normalize('NFC')===nn){
       status='same';
       if(S.extension.on && e.isDir) reason='Folders have no extension';
     }
@@ -1010,6 +1250,9 @@ function recompute(){
     computed.push({entry:e, newName:nn, status, reason});
   });
   compMap = new Map(computed.map(c=>[c.entry.path,c]));
+  syncPresetChoice();
+  saveRulesSoon();
+  if(S.template.on && S.template.compiled && S.template.compiled.usesMedia && !S.template.compiled.error) requestMedia(selEntries);
   const dh=document.getElementById('dt-hint');
   dh.style.display = missingDates ? 'block' : 'none';
   dh.textContent = missingDates ? missingDates+' file'+(missingDates>1?'s have':' has')+' no creation date on this volume.' : '';
@@ -1056,6 +1299,7 @@ function rowView(e, i){
   if(isSel && c){
     reason = c.reason || '';
     if(c.status==='conflict'){ cls=base+' conflict'; nwHtml=esc(c.newName||'(empty)'); stHtml='<i class="ti ti-alert-triangle" style="color:var(--red)"></i>'; }
+    else if(c.status==='wait'){ cls=base+' sel wait'; nwHtml=esc(c.newName); stHtml='<i class="ti ti-loader-2" style="color:var(--text3)"></i>'; }
     else if(c.status==='same'){ cls=base+' sel'; nwHtml=esc(c.newName); stHtml='<i class="ti ti-minus" style="color:var(--text3)"></i>'; }
     else {
       cls=base+' sel';
@@ -1067,7 +1311,7 @@ function rowView(e, i){
 }
 function makeRow(){
   const row=document.createElement('div');
-  row.innerHTML='<span class="cbox" data-cb="1" aria-hidden="true"></span><span class="cell cur"><i class="ti"></i><span class="nm"></span></span><span class="cell nw"></span><span class="st"></span>';
+  row.innerHTML='<span class="cbox" data-cb="1" aria-hidden="true"></span><span class="cell cur"><i class="ti"></i><span class="rel"></span><span class="nm"></span></span><span class="cell nw"></span><span class="st"></span>';
   return row;
 }
 function renderWindow(){
@@ -1091,6 +1335,7 @@ function renderWindow(){
       el.dataset.path=e.path; el.dataset.dir=e.isDir?'1':'0';
       el.querySelector('.cur i').className='ti '+(e.isDir ? 'ti-folder' : iconFor(e.ext));
       const nm=el.querySelector('.nm'); nm.textContent=e.name; el.title='';
+      el.querySelector('.rel').textContent=e._rel;
     }
     el.dataset.i=String(i);
     el.querySelector('.cbox').classList.toggle('on', v.isSel);
@@ -1138,8 +1383,8 @@ function iconFor(ext){
 
 function updateFooter(){
   const st = document.getElementById('status');
-  let conflicts=0, okCount=0;
-  for(const c of computed){ if(c.status==='conflict') conflicts++; else if(c.status==='ok') okCount++; }
+  let conflicts=0, okCount=0, waiting=0;
+  for(const c of computed){ if(c.status==='conflict') conflicts++; else if(c.status==='ok') okCount++; else if(c.status==='wait') waiting++; }
   const sel = computed.length;                       // selected AND visible
   const hidden = selected.size - sel;                // selected but hidden by the filter
   if(sel===0){ st.textContent = hidden ? hidden+' selected, hidden by the filter' : 'No selection'; }
@@ -1147,11 +1392,12 @@ function updateFooter(){
   // (green = will be written, red = cannot be, orange = hidden from view).
   else st.innerHTML = '<span>'+sel+' selected</span>'
       + '<span class="badge b-green">'+okCount+' TO RENAME</span>'
+      + (waiting? '<span class="badge b-blue">'+waiting+' READING</span>':'')
       + (conflicts? '<span class="badge b-red">'+conflicts+' CONFLICT'+(conflicts>1?'S':'')+'</span>':'')
       + (hidden? '<span class="badge b-orange">'+hidden+' HIDDEN</span>':'');
-  document.getElementById('btn-rename').disabled = okCount===0;
+  document.getElementById('btn-rename').disabled = renaming || okCount===0 || waiting>0;
   const ub=document.getElementById('btn-undo');
-  ub.disabled = !lastUndo;
+  ub.disabled = renaming || !lastUndo;
   ub.title = lastUndo ? 'Undo the last rename in '+api.basename(lastUndo.dir) : 'Nothing to undo';
 }
 
@@ -1224,7 +1470,7 @@ function volIcon(t){ if(t==='system')return 'ti-device-imac'; if(t==='home')retu
 // ---- navigation ----
 // Sort the folder listing. Folders always stay on top, whatever the key.
 function sortEntries(list){
-  const cmpName = (a,b) => collator.compare(a.name, b.name);
+  const cmpName = (a,b) => collator.compare(a._rel||'', b._rel||'') || collator.compare(a.name, b.name);
   list.sort((a,b)=>{
     if(a.isDir!==b.isDir) return a.isDir ? -1 : 1;
     let r=0;
@@ -1255,14 +1501,23 @@ function applyView(resort){
 // opts.select: paths to tick once the folder is read.
 async function openDir(p, opts){
   const tok = ++openToken;
+  mediaAsked.clear();
+  try { api.mediaCancel(); } catch(e){}
   let res;
-  try { res = await api.readDir(p); } catch(e){ res = {ok:false, error:String(e)}; }
+  try { res = await api.readDir(p, { recursive: withSubfolders }); } catch(e){ res = {ok:false, error:String(e)}; }
   if(tok!==openToken) return;                       // another folder was asked for meanwhile
   if(!res || !res.ok){ toast('Cannot open this folder'+(res && res.error ? ': '+res.error : '')); return; }
   const changed = p!==currentDir;
   currentDir = p;
   allEntries = res.entries;
-  for(const e of allEntries){ e._k = looseName(e.name); e._n = e.name.toLowerCase(); }
+  for(const e of allEntries){
+    if(!e.dir) e.dir = api.dirname(e.path);
+    e._k = looseName(e.name);
+    e._rel = e.rel ? e.rel.split(/[\\/]/).join('/')+'/' : '';
+    e._n = (e._rel+e.name).toLowerCase();     // the filter also finds the folder
+  }
+  otherNames = new Set((res.others||[]).map(o=>o.dir+'\u0000'+looseName(o.name)));
+  if(res.truncated) toast('Only the first '+allEntries.length+' files are listed: choose a smaller folder');
   const want = opts && opts.select ? new Set(opts.select.map(x=>String(x).normalize('NFC'))) : null;
   selected = new Set(want ? allEntries.filter(e=>want.has(e.path.normalize('NFC'))).map(e=>e.path) : []);
   focusIndex = -1; anchorIndex = -1; anchorPath = null; rangeBase = null;
@@ -1287,7 +1542,11 @@ function renderCrumbs(){
     const label = parent ? full.slice(parent.length).replace(/^[\\/]+/,'') : full;
     const last = i===chain.length-1;
     if(i>0) html += '<span class="sep">›</span>';
-    html += '<span class="cr'+(last?' last':'')+'" data-cd="'+esc(full)+'">'+esc(label||full)+'</span>';
+    // Parent folders are real buttons, so Tab reaches them and Enter or Space
+    // opens them; the current folder is plain text, there is nowhere to go.
+    html += last
+      ? '<span class="cr last" aria-current="page">'+esc(label||full)+'</span>'
+      : '<button type="button" class="cr" data-cd="'+esc(full)+'">'+esc(label||full)+'</button>';
   });
   c.innerHTML = html;
   c.title = currentDir;
@@ -1329,19 +1588,26 @@ function setFocus(i){
 }
 
 // ---- rename ----
-function busy(on){ document.getElementById('btn-rename').disabled = on || !computed.some(c=>c.status==='ok'); }
-async function callEngine(fn, arg){
-  try { return await fn(arg); }
-  catch(e){ return { ok:false, error:String(e && e.message || e), done:[], failed:[], undo:[], halted:true }; }
+// One batch at a time: while the engine works (Rename, Undo, Edit name),
+// Rename and Undo stay off whatever else happens in the window.
+let renaming = false;
+async function runEngine(pairs){
+  renaming = true; updateFooter();
+  let res;
+  try { res = await api.renameBatch(pairs); }
+  catch(e){ res = { ok:false, error:String(e && e.message || e), halted:true }; }
+  finally { renaming = false; }
+  res = res || {};
+  res.done = res.done || []; res.failed = res.failed || []; res.undo = res.undo || [];
+  return res;
 }
 async function doRename(){
   flushRecompute();
-  const pairs = computed.filter(c=>c.status==='ok').map(c=>({from:c.entry.path, to:api.join(currentDir, c.newName)}));
+  if(renaming || computed.some(c=>c.status==='wait')) return;
+  const pairs = computed.filter(c=>c.status==='ok').map(c=>({from:c.entry.path, to:api.join(c.entry.dir, c.newName)}));
   if(pairs.length===0) return;
   const dir = currentDir;
-  busy(true);
-  const res = await callEngine(api.renameBatch, pairs);
-  res.done = res.done || []; res.failed = res.failed || []; res.undo = res.undo || [];
+  const res = await runEngine(pairs);
   if(res.undo.length) lastUndo = { dir, pairs: res.undo };
   // Stay ticked: the renamed files, and the ones that could not be renamed
   // (so the batch can be tried again). Nothing known: the same selection.
@@ -1352,14 +1618,13 @@ async function doRename(){
   reportBatch(res, 'renamed');
 }
 async function doUndo(){
-  if(!lastUndo) return;
+  if(!lastUndo || renaming) return;
   flushRecompute();
   const { dir, pairs } = lastUndo;
   lastUndo = null;
   // The engine reads the folder again and checks every name before touching
   // anything: a file recreated since the rename is never overwritten.
-  const res = await callEngine(api.renameBatch, pairs);
-  res.done = res.done || []; res.failed = res.failed || [];
+  const res = await runEngine(pairs);
   await openDir(dir, { select: res.done.map(d=>d.to) });
   reportBatch(res, 'restored');
 }
@@ -1431,60 +1696,37 @@ function useAsSearch(text){
 // One file or folder renamed on its own, now, with no batch preview. It goes
 // through the same engine as a batch: same checks, same Undo.
 function showEditName(path){
-  if(document.getElementById('edit-ov')) return;
-  const entry=allEntries.find(x=>x.path===path); if(!entry) return;
-  const dir=currentDir;
-  const ov=document.createElement('div'); ov.id='edit-ov';
-  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
-  const card=document.createElement('div'); card.className='upd-card';
-  const h=document.createElement('div'); h.className='upd-h'; h.textContent='Edit name';
-  const sub=document.createElement('div'); sub.className='upd-sub';
-  sub.textContent='This '+(entry.isDir?'folder':'file')+' is renamed right away, outside the batch. Undo brings the old name back.';
-  const input=document.createElement('input'); input.className='fld'; input.id='edit-name'; input.value=entry.name;
-  input.spellcheck=false; input.setAttribute('autocomplete','off'); input.setAttribute('aria-label','New name');
-  const err=document.createElement('div'); err.className='edit-err'; err.setAttribute('role','alert');
-  const act=document.createElement('div'); act.className='upd-actions';
-  const cancel=document.createElement('button'); cancel.type='button'; cancel.className='upd-btn'; cancel.textContent='Cancel';
-  const go=document.createElement('button'); go.type='button'; go.className='upd-btn upd-go'; go.textContent='Rename';
-  act.appendChild(cancel); act.appendChild(go);
-  card.appendChild(h); card.appendChild(sub); card.appendChild(input); card.appendChild(err); card.appendChild(act);
-  ov.appendChild(card); document.body.appendChild(ov);
-  let busyNow=false;
-  // What the preview already knows: the same checks, in words, before the engine.
-  const problem=()=>{
-    const v=input.value;
-    if(v===entry.name) return { quiet:true };
-    const p=nameProblem(v); if(p) return { why:p };
-    const k=looseName(v);
-    if(allEntries.some(x=>x.path!==entry.path && x._k===k)) return { why:'A file with this name is already in the folder' };
-    return null;
-  };
-  const check=()=>{ const p=problem(); err.textContent = p && p.why ? p.why : ''; go.disabled = busyNow || !!p; };
-  input.addEventListener('input', check);
-  const close=()=>ov.remove();
-  cancel.onclick=close;
-  const submit=async()=>{
-    if(busyNow || problem()) return;
-    busyNow=true; check();
-    const to=api.join(dir, input.value);
-    const res=await callEngine(api.renameBatch, [{ from:entry.path, to }]);
-    res.done=res.done||[]; res.failed=res.failed||[]; res.undo=res.undo||[];
-    // Refused with nothing touched: say why, and let the name be corrected.
-    if(!res.done.length && res.failed.length===1 && !res.halted && !res.error){
-      busyNow=false; check(); err.textContent=res.failed[0].error; input.focus(); return;
-    }
-    close();
+  const entry=allEntries.find(x=>x.path===path); if(!entry || renaming) return;
+  const dir=currentDir;                 // the folder to show again afterwards
+  let res=null, to=null;
+  const dot=entry.isDir ? -1 : entry.name.lastIndexOf('.');
+  openDialog({
+    title:'Edit name', id:'edit-name', label:'New name', value:entry.name, ok:'Rename',
+    sub:'This '+(entry.isDir?'folder':'file')+' is renamed right away, outside the batch. Undo brings the old name back.',
+    select:[0, dot>0 ? dot : entry.name.length],
+    // What the preview already knows: the same checks, in words, before the engine.
+    check: v=>{
+      if(v===entry.name) return { quiet:true };
+      const why=nameProblem(v); if(why) return { why };
+      const k=looseName(v);
+      if(allEntries.some(x=>x.path!==entry.path && x.dir===entry.dir && x._k===k) || otherNames.has(entry.dir+'\u0000'+k))
+        return { why:'A file with this name is already in the folder' };
+      return null;
+    },
+    submit: async v=>{
+      to=api.join(entry.dir, v);
+      res=await runEngine([{ from:entry.path, to }]);
+      // Refused with nothing touched: say why, and let the name be corrected.
+      if(!res.done.length && res.failed.length===1 && !res.halted && !res.error){ const why=res.failed[0].error; res=null; return why; }
+      return null;
+    },
+  }).then(async v=>{
+    if(v===null || !res) return;
     if(res.undo.length) lastUndo={ dir, pairs:res.undo };
     const keep=[...selected].map(q=>q===entry.path ? to : q);
     await openDir(dir, { select: res.done.length ? keep : [...selected] });
     reportBatch(res, 'renamed');
-  };
-  go.onclick=submit;
-  input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
-  check();
-  input.focus();
-  const dot=entry.isDir ? -1 : entry.name.lastIndexOf('.');
-  input.setSelectionRange(0, dot>0 ? dot : entry.name.length);
+  });
 }
 
 // ---- after a batch: a toast when all went well, a full report otherwise ----
@@ -1546,6 +1788,7 @@ function showReport(title, sub, rows, actions){
 // Files a batch left under a temporary name, including the hidden ones
 // written by renamo up to 1.6.2. They come with the folder listing.
 function showLeftovers(list){
+  shownLeftovers = list;
   const box=document.getElementById('leftovers');
   if(!list.length){ box.style.display='none'; return; }
   const legacy = list.filter(l=>l.kind==='legacy').length;
@@ -1557,9 +1800,17 @@ function showLeftovers(list){
 async function recoverHere(){
   if(!currentDir) return;
   const dir=currentDir;
-  let res;
-  try { res = await api.recoverLeftovers(dir); } catch(e){ res = { restored:[], failed:[], error:String(e && e.message || e) }; }
-  res.restored = res.restored || []; res.failed = res.failed || [];
+  // With subfolders, the leftovers may sit in several folders: each one is
+  // brought back in its own folder.
+  const dirs=[...new Set(shownLeftovers.map(l=>api.dirname(l.path)))];
+  if(!dirs.length) dirs.push(dir);
+  const res={ restored:[], failed:[] };
+  for(const d of dirs){
+    let r;
+    try { r = await api.recoverLeftovers(d); } catch(e){ r = { restored:[], failed:[], error:String(e && e.message || e) }; }
+    res.restored.push(...(r.restored||[])); res.failed.push(...(r.failed||[]));
+    if(r.error) res.error = r.error;
+  }
   await openDir(dir);
   if(res.error && !res.restored.length && !res.failed.length){
     showReport('Nothing was brought back', 'renamo could not read the folder: '+res.error+'. Nothing was changed.', []);
@@ -1598,6 +1849,7 @@ function autoActivate(card){
 }
 document.getElementById('modules').addEventListener('input', e=>{ autoActivate(e.target.closest('.mcard')); scheduleRecompute(); });
 document.getElementById('modules').addEventListener('change', e=>{ autoActivate(e.target.closest('.mcard')); syncExtMode(); recompute(); });
+// (the preset list stops its own events: choosing in it is not a rule setting)
 document.querySelectorAll('.sw').forEach(sw=>{
   sw.addEventListener('click', ()=>{ setRule(sw.dataset.sw, !sw.classList.contains('on')); recompute(); });
 });
@@ -1617,6 +1869,233 @@ function pickSeg(group, btn){
     const nb=bs[(k+(e.key==='ArrowRight'?1:bs.length-1))%bs.length]; nb.focus(); pickSeg(g, nb);
   });
 });
+document.getElementById('sub-toggle').addEventListener('click', ()=>{
+  const b=document.getElementById('sub-toggle');
+  withSubfolders = !withSubfolders;
+  setOn(b, withSubfolders);
+  if(currentDir) openDir(currentDir, { select: [...selected] });
+});
+// A tag button writes its tag where the cursor is in the template.
+document.getElementById('tp-toks').addEventListener('click', e=>{
+  const b=e.target.closest('.tok'); if(!b) return;
+  const f=document.getElementById('tp-pattern');
+  const a=f.selectionStart==null ? f.value.length : f.selectionStart, z=f.selectionEnd==null ? a : f.selectionEnd;
+  f.value=f.value.slice(0,a)+b.dataset.tok+f.value.slice(z);
+  f.focus(); f.setSelectionRange(a+b.dataset.tok.length, a+b.dataset.tok.length);
+  autoActivate(b.closest('.mcard'));
+  recompute();
+});
+// ---- the rules as they were left, kept for the next launch ----
+// Every field, switch, two-way choice and checkbox of the rule panel, in
+// renamo's own storage on this computer. Subfolders is not kept: opening a
+// whole disk with it on at launch could take long.
+const RULES_KEY='renamo.rules';
+function rulesState(){
+  const m=document.getElementById('modules'), o={ fields:{}, on:{}, segs:{}, checks:{} };
+  m.querySelectorAll('input[id], select[id], textarea[id]').forEach(el=>{ if(el.id!=='tp-preset') o.fields[el.id]=el.value; });
+  m.querySelectorAll('.sw[data-sw]').forEach(sw=>{ o.on[sw.dataset.sw]=sw.classList.contains('on'); });
+  m.querySelectorAll('.seg[id]').forEach(g=>{ const a=g.querySelector('.active'); if(a) o.segs[g.id]=a.dataset.v; });
+  m.querySelectorAll('.chk-inline[id]').forEach(b=>{ o.checks[b.id]=b.classList.contains('on'); });
+  return o;
+}
+let saveRulesT=null;
+function saveRulesSoon(){
+  clearTimeout(saveRulesT);
+  saveRulesT=setTimeout(()=>{ try { localStorage.setItem(RULES_KEY, JSON.stringify(rulesState())); } catch(e){} }, 300);
+}
+function restoreRules(){
+  let o; try { o=JSON.parse(localStorage.getItem(RULES_KEY)||'null'); } catch(e){ o=null; }
+  if(!o || typeof o!=='object') return;
+  // Only controls of the rules panel are touched, whatever the saved state says.
+  const panel=document.getElementById('modules');
+  const inPanel=id=>{ const el=document.getElementById(id); return el && panel.contains(el) ? el : null; };
+  for(const [id,v] of Object.entries(o.fields||{})){ const el=inPanel(id); if(el && id!=='tp-preset' && typeof v==='string') el.value=v; }
+  for(const [k,on] of Object.entries(o.on||{})){ if(panel.querySelector('.sw[data-sw="'+k+'"]') && inPanel('card-'+k)) setRule(k, !!on); }
+  for(const [id,v] of Object.entries(o.segs||{})){
+    const g=inPanel(id); if(!g || !g.classList.contains('seg')) continue;
+    g.querySelectorAll('button').forEach(x=>{ const on=x.dataset.v===v; x.classList.toggle('active', on); x.setAttribute('aria-checked', on?'true':'false'); });
+  }
+  for(const [id,on] of Object.entries(o.checks||{})){ const b=inPanel(id); if(b && b.classList.contains('chk-inline')) setOn(b, !!on); }
+  syncExtMode();
+}
+
+// ---- template presets ----
+// Kept in renamo's own storage on this computer, never in the user's folders;
+// shared as one line of text (presetToText / presetFromText).
+const PRESETS_KEY='renamo.templatePresets';
+function loadPresets(){
+  try {
+    const v=JSON.parse(localStorage.getItem(PRESETS_KEY)||'[]');
+    return Array.isArray(v) ? v.filter(p=>p && typeof p.name==='string' && typeof p.template==='string') : [];
+  } catch(e){ return []; }
+}
+function storePresets(list){
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); return true; }
+  catch(e){ toast('The presets could not be kept on this computer'); return false; }
+}
+function selectedPreset(){
+  const name=document.getElementById('tp-preset').value;
+  return name ? loadPresets().find(p=>p.name===name) || null : null;
+}
+function renderPresets(selectName){
+  const sel=document.getElementById('tp-preset'), list=loadPresets();
+  sel.innerHTML='<option value="">'+(list.length ? 'Presets' : 'No preset yet')+'</option>'
+    + list.map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>').join('');
+  sel.value = selectName && list.some(p=>p.name===selectName) ? selectName : '';
+  const has=!!sel.value;
+  document.getElementById('tp-copy').disabled=!has;
+  document.getElementById('tp-remove').disabled=!has;
+}
+// The list shows a preset only while the template field still holds it
+// (typing, a tag button or a restored setting may have changed the field).
+function syncPresetChoice(){
+  const p=selectedPreset();
+  if(p && p.template!==document.getElementById('tp-pattern').value) renderPresets('');
+}
+// Put a template in the field and switch the rule on.
+function useTemplate(template){
+  document.getElementById('tp-pattern').value=template;
+  autoActivate(document.getElementById('card-template'));
+  recompute();
+}
+
+/*
+ * The small windows (Edit name, presets): a question, an optional text field,
+ * and buttons. They close with their buttons only, like a report. While one is
+ * open the rest of the app is out of reach (inert), so Tab and the list keys
+ * stay inside; on closing, the focus goes back where it was.
+ *   opts.title, opts.sub, opts.field ('input' | 'textarea' | false), opts.id,
+ *   opts.value, opts.label, opts.readOnly, opts.select [start, end],
+ *   opts.ok (null: no OK button), opts.cancel, opts.neutral (plain OK button),
+ *   opts.check(value)  -> null | { why } | { quiet }  (quiet: OK off, no message)
+ *   opts.note(value)   -> text shown under the field (what will happen)
+ *   opts.submit(value) -> async; an error message keeps the window open
+ * Resolves with the value (OK) or null (Cancel).
+ */
+function openDialog(opts){
+  return new Promise(resolve=>{
+    if(document.getElementById('edit-ov')) return resolve(null);
+    const opener=document.activeElement;
+    const ov=document.createElement('div'); ov.id='edit-ov';
+    ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+    const card=document.createElement('div'); card.className='upd-card';
+    const h=document.createElement('div'); h.className='upd-h'; h.textContent=opts.title;
+    const sub=document.createElement('div'); sub.className='upd-sub'; sub.textContent=opts.sub||'';
+    card.appendChild(h); card.appendChild(sub);
+    let input=null;
+    if(opts.field!==false){
+      input=document.createElement(opts.field==='textarea' ? 'textarea' : 'input');
+      input.className='fld'; input.spellcheck=false; input.setAttribute('autocomplete','off');
+      if(opts.id) input.id=opts.id;
+      input.setAttribute('aria-label', opts.label||opts.title);
+      input.value=opts.value||''; if(opts.readOnly) input.readOnly=true;
+      card.appendChild(input);
+    }
+    const note=document.createElement('div'); note.className='edit-note';
+    const err=document.createElement('div'); err.className='edit-err'; err.setAttribute('role','alert');
+    const act=document.createElement('div'); act.className='upd-actions';
+    const cancel=document.createElement('button'); cancel.type='button'; cancel.className='upd-btn'; cancel.textContent=opts.cancel||'Cancel';
+    // An action that takes something away gets a plain button, not the main colour.
+    const go=document.createElement('button'); go.type='button'; go.className=opts.neutral ? 'upd-btn' : 'upd-btn upd-go'; go.textContent=opts.ok||'OK';
+    act.appendChild(cancel); if(opts.ok!==null) act.appendChild(go);
+    if(opts.note) card.appendChild(note);
+    card.appendChild(err); card.appendChild(act); ov.appendChild(card);
+    const behind=[...document.body.children];
+    behind.forEach(el=>{ el.inert=true; });
+    document.body.appendChild(ov);
+    const value=()=>input ? input.value : '';
+    let working=false;
+    const check=quiet=>{
+      const r=opts.check ? opts.check(value()) : null;
+      err.textContent = quiet || !r || r.quiet ? '' : r.why;
+      if(opts.note) note.textContent = opts.note(value()) || '';
+      go.disabled = working || !!r;
+      return !r;
+    };
+    const done=v=>{
+      ov.remove();
+      behind.forEach(el=>{ el.inert=false; });
+      if(opener && opener.isConnected && typeof opener.focus==='function') opener.focus();
+      resolve(v);
+    };
+    cancel.onclick=()=>{ if(!working) done(null); };
+    go.onclick=async()=>{
+      if(working || !check()) return;
+      if(opts.submit){
+        working=true; check(); cancel.disabled=true;
+        const why=await opts.submit(value());
+        working=false; cancel.disabled=false;
+        if(why){ check(); err.textContent=why; if(input) input.focus(); return; }
+      }
+      done(value());
+    };
+    if(input){
+      input.addEventListener('input', ()=>check());
+      if(opts.field!=='textarea') input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); go.click(); } });
+      input.focus();
+      if(opts.select) input.setSelectionRange(opts.select[0], opts.select[1]); else input.select();
+    } else go.focus();
+    check(true);
+  });
+}
+
+document.getElementById('tp-preset').addEventListener('change', e=>{
+  e.stopPropagation();                       // not a rule setting: the rule stays as it is
+  const p=selectedPreset();
+  renderPresets(p && p.name);
+  if(p) useTemplate(p.template);
+});
+document.getElementById('tp-preset').addEventListener('input', e=>e.stopPropagation());
+document.getElementById('tp-save').addEventListener('click', async ()=>{
+  const template=document.getElementById('tp-pattern').value;
+  if(!template.trim()){ toast('Write a template first'); return; }
+  if(template.length>PRESET_TEMPLATE_MAX){ toast('The template is too long for a preset ('+PRESET_TEMPLATE_MAX+' characters at most)'); return; }
+  const cur=selectedPreset();
+  const name=await openDialog({ title:'Save as preset', label:'Preset name', value: cur ? cur.name : '', ok:'Save',
+    sub:'The template is kept in renamo on this computer, under this name.',
+    check: v=>!v.trim() ? { why:'Give the preset a name' } : null,
+    note: v=>{ const old=v.trim() && presetNamed(loadPresets(), v); return old ? 'This replaces the preset "'+old.name+'".' : ''; } });
+  if(name===null) return;
+  const p=cleanPreset(name, template), replaced=!!presetNamed(loadPresets(), p.name);
+  if(storePresets(withPreset(loadPresets(), p))){
+    renderPresets(p.name);
+    toast(replaced ? 'Preset "'+p.name+'" updated' : 'Preset "'+p.name+'" saved');
+  }
+});
+document.getElementById('tp-copy').addEventListener('click', async ()=>{
+  const p=selectedPreset(); if(!p) return;
+  const text=presetToText(p);
+  try { await navigator.clipboard.writeText(text); toast('Preset copied: paste it in a message'); }
+  catch(e){
+    await openDialog({ title:'Copy this preset', sub:'Select the text and copy it (Cmd/Ctrl+C).', field:'textarea', value:text, readOnly:true, cancel:'Close', ok:null });
+  }
+});
+document.getElementById('tp-paste').addEventListener('click', async ()=>{
+  const text=await openDialog({ title:'Paste a preset', label:'Preset text', field:'textarea', ok:'Add',
+    sub:'Paste the text you were sent. It starts with "renamo-preset".',
+    check: v=>!v.trim() ? { quiet:true } : (presetFromText(v) ? null : { why:'This is not a renamo preset.' }),
+    // What was read, to check before adding it.
+    note: v=>{
+      const p=presetFromText(v); if(!p) return '';
+      const old=presetNamed(loadPresets(), p.name);
+      return 'Name: '+p.name+'\nTemplate: '+p.template + (old ? '\nThis replaces your preset "'+old.name+'".' : '');
+    } });
+  if(text===null) return;
+  const p=presetFromText(text), replaced=!!presetNamed(loadPresets(), p.name);
+  if(storePresets(withPreset(loadPresets(), p))){
+    renderPresets(p.name);
+    useTemplate(p.template);
+    toast(replaced ? 'Preset "'+p.name+'" updated' : 'Preset "'+p.name+'" added');
+  }
+});
+document.getElementById('tp-remove').addEventListener('click', async ()=>{
+  const p=selectedPreset(); if(!p) return;
+  const ok=await openDialog({ title:'Remove the preset "'+p.name+'"?', field:false, ok:'Remove', neutral:true,
+    sub:'Only the preset leaves the list. The template field and your files stay as they are.' });
+  if(ok===null) return;
+  if(storePresets(loadPresets().filter(x=>x.name!==p.name))){ renderPresets(''); toast('Preset "'+p.name+'" removed'); }
+});
+
 ['rp-case','rx-icase'].forEach(id=>{
   const b=document.getElementById(id);
   b.addEventListener('click', ()=>{ setOn(b, !b.classList.contains('on')); autoActivate(b.closest('.mcard')); recompute(); });
@@ -1640,6 +2119,14 @@ document.getElementById('tree').addEventListener('click', e=>{
   const tog=e.target.closest('.chev');
   if(tog){ const n=nodeIndex.get(tog.dataset.tog); if(n) expandNode(n); return; }
   const node=e.target.closest('.tnode'); if(node) openDir(node.dataset.tpath);
+});
+// The start of a deep path is cut: a crumb reached with Tab scrolls into view,
+// and the path goes back to showing the current folder when focus leaves it.
+document.getElementById('crumbs').addEventListener('focusin', e=>{
+  const cr=e.target.closest('.cr'); if(cr) cr.scrollIntoView({block:'nearest',inline:'nearest'});
+});
+document.getElementById('crumbs').addEventListener('focusout', e=>{
+  if(!e.currentTarget.contains(e.relatedTarget)) fitCrumbs();
 });
 document.getElementById('crumbs').addEventListener('click', e=>{
   const cr=e.target.closest('.cr'); if(cr && !cr.classList.contains('last')) openDir(cr.dataset.cd);
@@ -1773,6 +2260,8 @@ document.addEventListener('keydown', e=>{
   const mod = e.metaKey || e.ctrlKey;
   if(mod && (e.key==='f'||e.key==='F')){ e.preventDefault(); fltEl.focus(); fltEl.select(); return; }
   const ae=document.activeElement;
+  const typing = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable);
+  if((e.metaKey || (e.ctrlKey && plat!=='darwin')) && e.key==='ArrowUp' && !typing){ e.preventDefault(); goUp(); return; }
   const inList = !ae || ae===document.body || document.getElementById('list').contains(ae);
   if(!inList) return;
   if(!entries.length) return;
@@ -1821,9 +2310,12 @@ document.body.classList.add(plat==='darwin'?'mac':(plat==='win32'?'win':'linux')
   document.getElementById('reveal-label').textContent = fm;
   document.getElementById('btn-reveal').title = 'Show the current folder in '+fm;
 })();
+restoreRules();
+renderPresets('');
 syncExtMode();
 refreshSortUI();
 refreshFilterUI();
+recompute();
 loadVolumes();
 renderList();
 updateFooter();

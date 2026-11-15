@@ -420,7 +420,7 @@ t('the journal lives outside the renamed folder', () => {
 t('no delete, copy, truncate or write call on user files anywhere in the app', () => {
   const src = f => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
   const forbidden = /\b(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync|truncate|truncateSync|ftruncate|copyFile|copyFileSync|cp|cpSync|appendFile|appendFileSync|createWriteStream)\s*\(/;
-  for (const f of ['main.js', 'preload.js', 'rename-engine.js', 'volumes-linux.js']) {
+  for (const f of ['main.js', 'preload.js', 'rename-engine.js', 'volumes-linux.js', 'list-folder.js', 'media-info.js']) {
     const code = src(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     const m = code.match(forbidden);
     assert.ok(!m, f + ' calls ' + (m && m[1]));
@@ -429,6 +429,12 @@ t('no delete, copy, truncate or write call on user files anywhere in the app', (
   const eng = src('rename-engine.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   const writes = eng.match(/writeFileSync\([^)]*\)/g) || [];
   assert.ok(writes.length === 1 && /journalPath \+ '\.part'/.test(writes[0]), 'unexpected write: ' + writes.join(' | '));
+  // The video information reader opens files read only, and only that way.
+  const media = src('media-info.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const opens = media.match(/\bopen(Sync)?\s*\([^)]*\)/g) || [];
+  assert.ok(opens.length === 1 && /open\(p, 'r'\)/.test(opens[0]), 'media-info.js opens files other than read only: ' + opens.join(' | '));
+  assert.ok(!/\b(write|writeSync|rename|renameSync|writeFile|writeFileSync|utimes|chmod)\s*\(/.test(media), 'media-info.js writes');
+  assert.ok(!/\b(write|writeSync|rename|renameSync|writeFile|writeFileSync|utimes|chmod|mkdir)\s*\(/.test(src('list-folder.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')), 'list-folder.js writes');
   // main.js renames nothing itself: everything goes through the engine
   const main = src('main.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/\brenameSync\s*\(|\brename\s*\(/.test(main), 'main.js renames files outside the engine');

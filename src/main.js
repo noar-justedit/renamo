@@ -21,20 +21,8 @@ const fs = require('fs');
 const os = require('os');
 const https = require('https');
 const { linuxVolumes } = require('./volumes-linux');
-
-// Folder listings are sorted once with one collator (creating the comparison
-// options for every pair made a 10 000-file sort 15 times slower).
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-
-// Run `fn` over `list` with at most `limit` calls in flight. On a network share
-// each stat is a round trip: 48 at a time instead of one after the other.
-async function mapLimit(list, limit, fn) {
-  const out = new Array(list.length);
-  let next = 0;
-  const worker = async () => { while (next < list.length) { const k = next++; out[k] = await fn(list[k], k); } };
-  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
-  return out;
-}
+const { listFolder, mapLimit } = require('./list-folder');
+const { readMediaInfo, cancelMediaReads } = require('./media-info');
 
 const isStr = v => typeof v === 'string' && v.length > 0;
 
@@ -262,47 +250,33 @@ ipcMain.handle('list-volumes', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Read a directory. Asynchronous, with the stats run 48 at a time: on a NAS a
-// folder of 10 000 files no longer freezes the window for seconds. With
-// { dirsOnly: true } (the disk tree) files are not even looked at.
+// Read a folder for the list (see list-folder.js): one folder, or with
+// { recursive: true } the files of all its subfolders. { dirsOnly: true } is
+// the disk tree.
 // ---------------------------------------------------------------------------
 ipcMain.handle('read-dir', async (_e, dirPath, opts) => {
   if (!isStr(dirPath)) return { ok: false, error: 'invalid path' };
-  const dirsOnly = !!(opts && opts.dirsOnly);
+  const o = opts && typeof opts === 'object' ? opts : {};
   try {
-    const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true });
-    let visible = dirents.filter(d => !d.name.startsWith('.'));
-    if (dirsOnly) visible = visible.filter(d => !d.isFile());
-    const rows = await mapLimit(visible, 48, async (d) => {
-      const full = path.join(dirPath, d.name);
-      if (dirsOnly && d.isDirectory()) return { name: d.name, path: full, isDir: true, ext: '', size: 0, birthtimeMs: 0, mtimeMs: 0 };
-      let st;
-      try { st = await fs.promises.stat(full); } catch (err) { return null; }
-      const isDir = st.isDirectory();
-      if (dirsOnly && !isDir) return null;
-      const dot = d.name.lastIndexOf('.');
-      return {
-        name: d.name,
-        path: full,
-        isDir,
-        ext: (!isDir && dot > 0) ? d.name.slice(dot + 1) : '',
-        size: st.size,
-        // 0 when the volume does not record a creation date (most NAS shares,
-        // Linux): the window then says so instead of silently using today.
-        birthtimeMs: st.birthtimeMs > 0 ? st.birthtimeMs : 0,
-        mtimeMs: st.mtimeMs,
-      };
-    });
-    const entries = rows.filter(Boolean);
-    entries.sort((a, b) => (a.isDir !== b.isDir) ? (a.isDir ? -1 : 1) : collator.compare(a.name, b.name));
-    // Leftovers of an interrupted rename, found in the same listing (hidden
-    // names included) instead of reading the folder a second time.
-    const leftovers = dirsOnly ? [] : getEngine().leftoversFrom(dirPath, dirents.map(d => d.name));
-    return { ok: true, entries, leftovers };
+    const { entries, others, listings, truncated } = await listFolder(dirPath, { dirsOnly: !!o.dirsOnly, recursive: !!o.recursive });
+    // Leftovers of an interrupted rename, found in the listings already read
+    // (hidden names included) instead of reading the folders a second time.
+    const leftovers = o.dirsOnly ? [] : listings.flatMap(l => getEngine().leftoversFrom(l.dir, l.names));
+    return { ok: true, entries, others, leftovers, truncated };
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
   }
 });
+
+// Video information (resolution, frame rate, codec, recording date), read by
+// MediaInfo, read only. At most 200 files per call; each answer is { path,
+// info }, { path, error } or { path, cancelled } (see media-cancel).
+ipcMain.handle('media-info', async (_e, paths) => {
+  const list = Array.isArray(paths) ? paths.filter(isStr).slice(0, 200) : [];
+  return Promise.all(list.map(p => readMediaInfo(p)));
+});
+// Another folder is being opened: the files still waiting are not read.
+ipcMain.handle('media-cancel', () => { cancelMediaReads(); return true; });
 
 // ---------------------------------------------------------------------------
 // Batch rename. All file operations live in rename-engine.js, which only ever

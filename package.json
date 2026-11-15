@@ -1,11 +1,11 @@
 {
   "name": "renamo",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Batch file renamer",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/engine.test.js && node test/ui.test.js && node test/safety.test.js && node test/linux.test.js",
+    "test": "node test/engine.test.js && node test/ui.test.js && node test/safety.test.js && node test/linux.test.js && node test/listing.test.js && node test/media.test.js",
     "build:mac": "electron-builder --mac --arm64",
     "build:mac-universal": "electron-builder --mac dmg --universal",
     "build:win": "electron-builder --win --x64",
@@ -41,7 +41,7 @@
           ]
         }
       ],
-      "minimumSystemVersion": "11.0",
+      "minimumSystemVersion": "13.0",
       "darkModeSupport": true,
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
@@ -156,10 +156,12 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
-    "electron": "^42.0.0",
+    "electron": "^45.3.2",
     "electron-builder": "^26.15.3"
   },
-  "dependencies": {},
+  "dependencies": {
+    "mediainfo.js": "^0.3.8"
+  },
   "author": "just edit",
   "license": "GPL-3.0-or-later",
   "repository": {

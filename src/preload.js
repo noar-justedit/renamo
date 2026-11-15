@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld('renamo', {
   listVolumes: () => ipcRenderer.invoke('list-volumes'),
   readDir: (p, opts) => ipcRenderer.invoke('read-dir', p, opts),
   statPaths: (paths) => ipcRenderer.invoke('stat-paths', paths),
+  mediaInfo: (paths) => ipcRenderer.invoke('media-info', paths),
+  mediaCancel: () => ipcRenderer.invoke('media-cancel'),
   getPathForFile,
   renameBatch: (pairs) => ipcRenderer.invoke('rename-batch', pairs),
   scanLeftovers: (dir) => ipcRenderer.invoke('scan-leftovers', dir),
